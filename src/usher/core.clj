@@ -1,7 +1,7 @@
 (ns usher.core)
 
 (defn init [in out]
-  {:syn   {#(in) 0},      ; Collection of synthesized programs.
+  {:syn   {identity 1},      ; Collection of synthesized programs.
                           ;; (bipartite) Goal graph:
    :graph {:goals [out],  ; Goals.
            :resolvers [], ; Resolvers connecting goals to subgoals.
@@ -10,7 +10,7 @@
                           ;; Set of examples:
    :ex    [in out]})      ; Input and output vectors.
 
-(def addp conj)
+(def add-p conj)
 
 (defn synth [component programs]
   "Synthesizes new program by applying components to existing programs."
@@ -20,14 +20,16 @@
   (reduce
     (fn [syn prog]
       (if (= (val prog) size)
-        (addp syn (synth prog syn))
+        (add-p syn (synth prog syn))
         syn))
     syn
     comps))
 
 (defn split [usher]
   "SplitGoal rule, adds more resolvers to the goal graph."
-  usher)
+  (let [n (count (->> first :ex usher))
+        moregoals (vec (repeat 3 true))] ; Producing arbitrary condition values.
+    (update-in usher [:graph :goals] #(conj % moregoals))))
 
 (defn wrap-p [p]
   (fn [& args]
@@ -37,18 +39,19 @@
           (catch Throwable t :err))
         (callee)))))
 
-(defn evalp [p in]
+(defn eval-p [p in]
   "Evaluates program p given inputs vector in. Returns :err on error."
   (vec (map (wrap-p p) in)))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (let [usher (init in out)
-        syn   (:syn init)
+        syn   (:syn usher)
         fwd   (forward 0 syn comps)
         fwd2  (forward 1 fwd comps)
         split (split usher)]
-    (map #(evalp % in) fwd2)))
+    #_(map #(eval-p % in) fwd2)
+    split))
 
 
 (defn zero [] 0)
