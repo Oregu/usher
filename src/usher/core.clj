@@ -1,34 +1,39 @@
 (ns usher.core)
 
 (defn init [in out]
-  {:syn   {`identity 1},
-   :graph {:goals [out],
-           :resolvers [],
-           :egdes [],
-           :root out},
-   :ex    [in out]})
+  {:syn   {identity 1},   ; Collection of synthesized programs.
+                          ;; (bipartite) Goal graph:
+   :graph {:goals [out],  ; Goals.
+           :resolvers [], ; Resolvers connecting goals to subgoals.
+           :egdes [],     ; Edges connecting goals and resolvers.
+           :root out},    ; Root, a result we should produce.
+                          ;; Set of examples:
+   :ex    [in out]})      ; Input and output vectors.
 
 (def addp conj)
 
 (defn synth [component programs]
   "Synthesizes new program by applying components to existing programs"
-  #_(addp component programs)
   component)
 
 (defn forward [syn comps]
-  (let [c (first comps)
-        p (synth c syn)]
-    #_(addp p syn)
-    (apply hash-map p)))
+  (let [ps (map #(synth % syn) comps)]
+    (addp syn ps)))
+
+(defn wrap-err [f]
+  (fn [& args]
+    (try (apply f args)
+      (catch Throwable t :err))))
 
 (defn evalp [p in]
-  "Evaluates program p given inputs vector in"
-  (map (eval (key p)) in))
+  "Evaluates program p given inputs vector in. Returns :err on error."
+  (vec (map (wrap-err (key p)) in)))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (let [init (init in out)
-        fwd (forward (:syn init) comps)]
+        syn  (:syn init)
+        fwd  (forward syn comps)]
     (map #(evalp % in) fwd)))
 
 (defn zero [] 0)
@@ -37,8 +42,8 @@
   (run
     [[] [3] [1 2]] ; input
     [0 1 2]        ; output
-    {`zero   0,    ; components with arity a(c)
-     `empty? 1,
-     `inc    1,
-     `first  1,
-     `rest   1}))
+    {zero   0,     ; components with arity a(c)
+     empty? 1,
+     inc    1,
+     first  1,
+     rest   1}))
