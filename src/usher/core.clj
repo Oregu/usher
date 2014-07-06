@@ -13,21 +13,24 @@
 (def addp conj)
 
 (defn synth [component programs]
-  "Synthesizes new program by applying components to existing programs"
+  "Synthesizes new program by applying components to existing programs."
   component)
 
 (defn forward [syn comps]
   (let [ps (map #(synth % syn) comps)]
     (addp syn ps)))
 
-(defn wrap-err [f]
+(defn wrap-p [p]
   (fn [& args]
-    (try (apply f args)
-      (catch Throwable t :err))))
+    (let [[callee arity] p]
+      (if (pos? arity)
+        (try (apply callee args)
+          (catch Throwable t :err))
+        (callee)))))
 
 (defn evalp [p in]
   "Evaluates program p given inputs vector in. Returns :err on error."
-  (vec (map (wrap-err (key p)) in)))
+  (vec (map (wrap-p p) in)))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
@@ -35,6 +38,7 @@
         syn  (:syn init)
         fwd  (forward syn comps)]
     (map #(evalp % in) fwd)))
+
 
 (defn zero [] 0)
 
