@@ -1,7 +1,7 @@
 (ns usher.core)
 
 (defn init [in out]
-  {:syn   {identity 1},   ; Collection of synthesized programs.
+  {:syn   {#(in) 0},      ; Collection of synthesized programs.
                           ;; (bipartite) Goal graph:
    :graph {:goals [out],  ; Goals.
            :resolvers [], ; Resolvers connecting goals to subgoals.
@@ -16,9 +16,18 @@
   "Synthesizes new program by applying components to existing programs."
   component)
 
-(defn forward [syn comps]
-  (let [ps (map #(synth % syn) comps)]
-    (addp syn ps)))
+(defn forward [size syn comps]
+  (reduce
+    (fn [syn prog]
+      (if (= (val prog) size)
+        (addp syn (synth prog syn))
+        syn))
+    syn
+    comps))
+
+(defn split [usher]
+  "SplitGoal rule, adds more resolvers to the goal graph."
+  usher)
 
 (defn wrap-p [p]
   (fn [& args]
@@ -34,10 +43,12 @@
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
-  (let [init (init in out)
-        syn  (:syn init)
-        fwd  (forward syn comps)]
-    (map #(evalp % in) fwd)))
+  (let [usher (init in out)
+        syn   (:syn init)
+        fwd   (forward 0 syn comps)
+        fwd2  (forward 1 fwd comps)
+        split (split usher)]
+    (map #(evalp % in) fwd2)))
 
 
 (defn zero [] 0)
