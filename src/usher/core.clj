@@ -1,12 +1,13 @@
-(ns usher.core)
+(ns usher.core
+  (:require [clojure.math.combinatorics :as combo]))
 
 (defn init [in out]
-  {:syn   {identity 1},      ; Collection of synthesized programs.
+  {:syn   {identity 1},   ; Collection of synthesized programs.
                           ;; (bipartite) Goal graph:
-   :graph {:goals [out],  ; Goals.
+   :graph {:goals  [out], ; Goals.
            :resolvers [], ; Resolvers connecting goals to subgoals.
-           :egdes [],     ; Edges connecting goals and resolvers.
-           :root out},    ; Root, a result we should produce.
+           :egdes     [], ; Edges connecting goals and resolvers.
+           :root    out}, ; Root, a result we should produce.
                           ;; Set of examples:
    :ex    [in out]})      ; Input and output vectors.
 
@@ -27,9 +28,9 @@
 
 (defn split [usher]
   "SplitGoal rule, adds more resolvers to the goal graph."
-  (let [n (count (->> first :ex usher))
-        moregoals (vec (repeat 3 true))] ; Producing arbitrary condition values.
-    (update-in usher [:graph :goals] #(conj % moregoals))))
+  (let [n (count (->> usher :ex first))
+        moregoals (mapv vec (combo/selections [true false] n))] ; Producing arbitrary condition values.
+    (update-in usher [:graph :goals] #(apply conj % moregoals))))
 
 (defn wrap-p [p]
   (fn [& args]
@@ -41,7 +42,7 @@
 
 (defn eval-p [p in]
   "Evaluates program p given inputs vector in. Returns :err on error."
-  (vec (map (wrap-p p) in)))
+  (mapv (wrap-p p) in))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
