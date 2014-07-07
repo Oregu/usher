@@ -2,7 +2,7 @@
   (:require [clojure.math.combinatorics :as combo]))
 
 (defn init [in out]
-  {:syn   {identity 1},   ; Collection of synthesized programs.
+  {:syn   [[identity 1]],   ; Collection of synthesized programs.
                           ;; (bipartite) Goal graph:
    :graph {:goals  [out], ; Goals.
            :resolvers [], ; Resolvers connecting goals to subgoals.
@@ -20,7 +20,7 @@
 (defn forward [size syn comps]
   (reduce
     (fn [syn prog]
-      (if (= (val prog) size)
+      (if (= (second prog) size)
         (add-p syn (synth prog syn))
         syn))
     syn
@@ -29,7 +29,7 @@
 (defn split [usher]
   "SplitGoal rule, adds more resolvers to the goal graph."
   (let [n (count (->> usher :ex first))
-        moregoals (mapv vec (combo/selections [true false] n))] ; Producing arbitrary condition values.
+        moregoals (vec (combo/selections [true false] n))] ; Producing arbitrary condition values.
     (update-in usher [:graph :goals] #(apply conj % moregoals))))
 
 (defn wrap-p [p]
@@ -49,10 +49,12 @@
   (let [usher (init in out)
         syn   (:syn usher)
         fwd   (forward 0 syn comps)
-        fwd2  (forward 1 fwd comps)
-        split (split usher)]
-    #_(map #(eval-p % in) fwd2)
-    split))
+        usher (assoc usher :syn fwd)
+        gs    (map #(eval-p % in) fwd)
+        usher (update-in usher [:graph :goals] #(apply conj % gs))
+        split (split usher)
+        fwd2  (forward 1 fwd comps)]
+    usher))
 
 
 (defn zero [] 0)
@@ -61,8 +63,8 @@
   (run
     [[] [3] [1 2]] ; input
     [0 1 2]        ; output
-    {zero   0,     ; components with arity a(c)
-     empty? 1,
-     inc    1,
-     first  1,
-     rest   1}))
+    [[zero   0],     ; components with arity a(c)
+     [empty? 1],
+     [inc    1],
+     [first  1],
+     [rest   1]]))
