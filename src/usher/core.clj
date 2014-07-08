@@ -1,5 +1,4 @@
-(ns usher.core
-  (:require [clojure.math.combinatorics :as combo]))
+(ns usher.core)
 
 (defn init [in out]
   {:syn   [[identity 1]],   ; Collection of synthesized programs.
@@ -11,22 +10,32 @@
                           ;; Set of examples:
    :ex    [in out]})      ; Input and output vectors.
 
-(def add-p conj)
-
 (defn combine [v1 v2]
   "Utility. Combine two vectors."
   (reduce #(conj %1 %2) v1 v2))
 
-(defn synth [component programs]
-  "Synthesizes new program by applying components to existing programs."
-  component)
+(def add-p conj)
+
+(defn gen-p [c p]
+  "Generate new program with component (of size 1 for now)
+   and existing program"
+  (vec (cons c [p])))
+
+(defn synth [size component programs]
+  "Synthesizes new program by applying components of given size
+   to existing programs."
+  (if (pos? size)
+    ; TODO component should apply to existing goals
+    ; TODO and generate final programs by graph walking.
+    (mapv #(gen-p component %) programs)
+    [component]))
 
 (defn forward [size syn comps]
   (reduce
-    (fn [syn prog]
+    (fn [syn' prog]
       (if (= (second prog) size)
-        (add-p syn (synth prog syn))
-        syn))
+        (combine syn' (synth size prog syn))
+        syn'))
     syn
     comps))
 
@@ -106,7 +115,7 @@
         graph (split (:graph usher))
         usher (assoc usher :graph graph)
         fwd2  (forward 1 fwd comps)]
-    usher))
+    fwd2))
 
 
 (defn zero [] 0)

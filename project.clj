@@ -2,5 +2,4 @@
   :description "Resursive program syntesis."
   :url "http://github.com/Oregu/usher"
 
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/math.combinatorics "0.0.7"]])
+  :dependencies [[org.clojure/clojure "1.6.0"]])
