@@ -6,7 +6,7 @@
                           ;; (bipartite) Goal graph:
    :graph {:goals  [out], ; Goals.
            :resolvers [], ; Resolvers connecting goals to subgoals.
-           :egdes     [], ; Edges connecting goals and resolvers.
+           :edges     [], ; Edges connecting goals and resolvers.
            :root    out}, ; Root, a result we should produce.
                           ;; Set of examples:
    :ex    [in out]})      ; Input and output vectors.
@@ -56,21 +56,34 @@
 
 (defn g-then-else [cond+g]
   "For a cond goal vector build bthen and belse goals.
-   Return [bthen belse]."
+   Return [condg bthen belse]."
   (let [[cnd g] cond+g
         bthen (map-indexed (fn [ind itm] (if (true?  itm) (g ind) :?)) cnd)
         belse (map-indexed (fn [ind itm] (if (false? itm) (g ind) :?)) cnd)]
-    [(vec bthen) (vec belse)]))
+    [cnd (vec bthen) (vec belse)]))
 
 (defn split [usher]
   "SplitGoal rule, adds more resolvers to the goal graph."
   (let [n (count (-> usher :ex first))
-        gconds (g-conds (get-in usher [:graph :goals]))
-        bools  (map g-then-else gconds)]
+        gconds  (g-conds (get-in usher [:graph :goals]))
+        ; TODO foreach then-else!
+        ifgoals (first (map g-then-else gconds))
+        graph (:graph usher)
+        rslvr (keyword (str "r" (count (:resolvers graph))))]
     (-> usher
-      (update-in [:graph :goals] #(apply conj % (map first  gconds)))
-      (update-in [:graph :goals] #(apply conj % (map first  bools)))
-      (update-in [:graph :goals] #(apply conj % (map second bools))))))
+      ; Add goals: gcond, bthen, belse
+      (update-in [:graph :goals] #(conj % (ifgoals 0)))
+      (update-in [:graph :goals] #(conj % (ifgoals 1)))
+      (update-in [:graph :goals] #(conj % (ifgoals 2)))
+      ; Add fresh resolver
+      (update-in [:graph :resolvers] #(conj %1 rslvr))
+      ; Add 4 edges: (r, gdond), (gdond, r), (bthen, r), (belse, r)
+      (update-in [:graph :edges] #(conj %1 [rslvr (ifgoals 0)]))
+      ; TODO here should indexes of goals
+      (update-in [:graph :edges] #(conj %1 [(ifgoals 0) rslvr]))
+      (update-in [:graph :edges] #(conj %1 [(ifgoals 1) rslvr]))
+      (update-in [:graph :edges] #(conj %1 [(ifgoals 2) rslvr]))
+    )))
 
 (defn wrap-p [p]
   (fn [& args]
