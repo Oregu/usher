@@ -13,6 +13,10 @@
 
 (def add-p conj)
 
+(defn combine [v1 v2]
+  "Utility. Combine two vectors."
+  (reduce #(conj %1 %2) v1 v2))
+
 (defn synth [component programs]
   "Synthesizes new program by applying components to existing programs."
   component)
@@ -26,11 +30,35 @@
     syn
     comps))
 
+(defn goal-intersect [g1 g2]
+  "Returns boolean vector with truth in places of intersected positions.
+  If no interse found, returns nil."
+  (let [inter (mapv = g1 g2)]
+    (if (some true? inter) inter)))
+
+(defn goal-intersects [g goals]
+  "Returns bool vector of intersections between goal g and each of the goals."
+  (reduce #(if-let [inter (goal-intersect g %2)]
+            (conj %1 inter)
+            %1)
+          [] goals))
+
+(defn cond-goals [goals]
+  "Produces _arbitrary_ cond goals."
+  (let [upto (dec (count goals))]
+    (loop [conds [] ind 0]
+      (if (> ind upto)
+        conds
+        (recur
+          (combine conds (goal-intersects (goals ind) (subvec goals (inc ind))))
+          (inc ind))))))
+
 (defn split [usher]
   "SplitGoal rule, adds more resolvers to the goal graph."
-  (let [n (count (->> usher :ex first))
-        moregoals (vec (combo/selections [true false] n))] ; Producing arbitrary condition values.
-    (update-in usher [:graph :goals] #(apply conj % moregoals))))
+  (let [n (count (-> usher :ex first))
+        gconds (cond-goals (get-in usher [:graph :goals]))] ; Producing arbitrary condition values.
+    (-> usher
+      (update-in [:graph :goals] #(apply conj % gconds)))))
 
 (defn wrap-p [p]
   (fn [& args]
@@ -52,7 +80,7 @@
         usher (assoc usher :syn fwd)
         gs    (map #(eval-p % in) fwd)
         usher (update-in usher [:graph :goals] #(apply conj % gs))
-        split (split usher)
+        usher (split usher)
         fwd2  (forward 1 fwd comps)]
     usher))
 
