@@ -62,28 +62,26 @@
         belse (map-indexed (fn [ind itm] (if (false? itm) (g ind) :?)) cnd)]
     [cnd (vec bthen) (vec belse)]))
 
-(defn split [usher]
+(defn split [graph]
   "SplitGoal rule, adds more resolvers to the goal graph."
-  (let [n (count (-> usher :ex first))
-        gconds  (g-conds (get-in usher [:graph :goals]))
-        ; TODO foreach then-else!
+  (let [n (count (:root graph))
+        gconds  (g-conds (:goals graph))
+        ; TODO do foreach then-else!
         ifgoals (first (map g-then-else gconds))
-        graph (:graph usher)
         rslvr (keyword (str "r" (count (:resolvers graph))))]
-    (-> usher
+    (-> graph
       ; Add goals: gcond, bthen, belse
-      (update-in [:graph :goals] #(conj % (ifgoals 0)))
-      (update-in [:graph :goals] #(conj % (ifgoals 1)))
-      (update-in [:graph :goals] #(conj % (ifgoals 2)))
+      (update-in [:goals] #(conj % (ifgoals 0)))
+      (update-in [:goals] #(conj % (ifgoals 1)))
+      (update-in [:goals] #(conj % (ifgoals 2)))
       ; Add fresh resolver
-      (update-in [:graph :resolvers] #(conj %1 rslvr))
+      (update-in [:resolvers] #(conj %1 rslvr))
       ; Add 4 edges: (r, gdond), (gdond, r), (bthen, r), (belse, r)
-      (update-in [:graph :edges] #(conj %1 [rslvr (ifgoals 0)]))
-      ; TODO here should indexes of goals
-      (update-in [:graph :edges] #(conj %1 [(ifgoals 0) rslvr]))
-      (update-in [:graph :edges] #(conj %1 [(ifgoals 1) rslvr]))
-      (update-in [:graph :edges] #(conj %1 [(ifgoals 2) rslvr]))
-    )))
+      (update-in [:edges] #(conj %1 [rslvr (ifgoals 0)]))
+      ; TODO here should indexes of goals and resolvers
+      (update-in [:edges] #(conj %1 [(ifgoals 0) rslvr]))
+      (update-in [:edges] #(conj %1 [(ifgoals 1) rslvr]))
+      (update-in [:edges] #(conj %1 [(ifgoals 2) rslvr])))))
 
 (defn wrap-p [p]
   (fn [& args]
@@ -105,7 +103,8 @@
         usher (assoc usher :syn fwd)
         gs    (map #(eval-p % in) fwd)
         usher (update-in usher [:graph :goals] #(apply conj % gs))
-        usher (split usher)
+        graph (split (:graph usher))
+        usher (assoc usher :graph graph)
         fwd2  (forward 1 fwd comps)]
     usher))
 
