@@ -36,29 +36,41 @@
   (let [inter (mapv = g1 g2)]
     (if (some true? inter) inter)))
 
-(defn goal-intersects [g goals]
-  "Returns bool vector of intersections between goal g and each of the goals."
+(defn g-intersects [g goals]
+  "Returns bool vector of intersections between goal g and each of the goals.
+   (With g.)"
   (reduce #(if-let [inter (goal-intersect g %2)]
-            (conj %1 inter)
+            (conj %1 [inter g])
             %1)
           [] goals))
 
-(defn cond-goals [goals]
+(defn g-conds [goals]
   "Produces _arbitrary_ cond goals."
   (let [upto (dec (count goals))]
     (loop [conds [] ind 0]
       (if (> ind upto)
         conds
         (recur
-          (combine conds (goal-intersects (goals ind) (subvec goals (inc ind))))
+          (combine conds (g-intersects (goals ind) (subvec goals (inc ind))))
           (inc ind))))))
+
+(defn g-then-else [cond+g]
+  "For a cond goal vector build bthen and belse goals.
+   Return [bthen belse]."
+  (let [[cnd g] cond+g
+        bthen (map-indexed (fn [ind itm] (if (true?  itm) (g ind) :?)) cnd)
+        belse (map-indexed (fn [ind itm] (if (false? itm) (g ind) :?)) cnd)]
+    [(vec bthen) (vec belse)]))
 
 (defn split [usher]
   "SplitGoal rule, adds more resolvers to the goal graph."
   (let [n (count (-> usher :ex first))
-        gconds (cond-goals (get-in usher [:graph :goals]))] ; Producing arbitrary condition values.
+        gconds (g-conds (get-in usher [:graph :goals]))
+        bools  (map g-then-else gconds)]
     (-> usher
-      (update-in [:graph :goals] #(apply conj % gconds)))))
+      (update-in [:graph :goals] #(apply conj % (map first  gconds)))
+      (update-in [:graph :goals] #(apply conj % (map first  bools)))
+      (update-in [:graph :goals] #(apply conj % (map second bools))))))
 
 (defn wrap-p [p]
   (fn [& args]
