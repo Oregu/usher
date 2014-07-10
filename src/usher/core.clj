@@ -94,11 +94,17 @@
 
 (defn wrap-p [p]
   (fn [& args]
-    (let [[callee arity] p]
-      (if (pos? arity)
-        (try (apply callee args)
-          (catch Throwable t :err))
-        (callee)))))
+    (if (vector? (first p)) ; Is program consist of several components
+      (try
+        (if (pos? (second (second p)))
+          ((first (first p)) ((first (second p)) (first args))) ; TEMP f(g(h(args)))
+          ((first (first p)) ((first (second p)))))     ; TEMP f(g(h))
+        (catch Throwable t :err))
+      (let [[callee arity] p]
+        (if (pos? arity)
+          (try (apply callee (first args))
+            (catch Throwable t :err))
+          (callee))))))
 
 (defn eval-p [p in]
   "Evaluates program p given inputs vector in. Returns :err on error."
@@ -114,17 +120,18 @@
         usher (update-in usher [:graph :goals] #(apply conj % gs))
         graph (split (:graph usher))
         usher (assoc usher :graph graph)
-        fwd2  (forward 1 fwd comps)]
-    fwd2))
+        fwd2  (forward 1 fwd comps)
+        gs2   (map #(eval-p % in) fwd2)]
+    gs2))
 
 
 (defn zero [] 0)
 
-(defn run-test-run []
+(defn do-magic []
   (run
     [[] [3] [1 2]] ; input
     [0 1 2]        ; output
-    [[zero   0],     ; components with arity a(c)
+    [[zero   0],   ; components with arity a(c)
      [empty? 1],
      [inc    1],
      [first  1],
