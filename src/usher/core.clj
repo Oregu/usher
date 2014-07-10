@@ -1,25 +1,23 @@
 (ns usher.core)
 
 (defn init [in out]
-  {:syn   [[identity 1]],   ; Collection of synthesized programs.
-                          ;; (bipartite) Goal graph:
-   :graph {:goals  [out], ; Goals.
-           :resolvers [], ; Resolvers connecting goals to subgoals.
-           :edges     [], ; Edges connecting goals and resolvers.
-           :root    out}, ; Root, a result we should produce.
-                          ;; Set of examples:
-   :ex    [in out]})      ; Input and output vectors.
+  {:syn   [[[identity 1]]], ; Collection of synthesized programs.
+                            ;; (bipartite) Goal graph:
+   :graph {:goals  [out],   ; Goals.
+           :resolvers [],   ; Resolvers connecting goals to subgoals.
+           :edges     [],   ; Edges connecting goals and resolvers.
+           :root    out},   ; Root, a result we should produce.
+                            ;; Set of examples:
+   :ex    [in out]})        ; Input and output vectors.
 
 (defn combine [v1 v2]
   "Utility. Combine two vectors."
   (reduce #(conj %1 %2) v1 v2))
 
-(def add-p conj)
-
 (defn gen-p [c p]
   "Generate new program with component (of size 1 for now)
-   and existing program"
-  (vec (cons c [p])))
+   and existing program."
+  (vec (cons c p)))
 
 (defn synth [size component programs]
   "Synthesizes new program by applying components of given size
@@ -30,13 +28,13 @@
     (mapv #(gen-p component %) programs)
     [component]))
 
-(defn forward [size syn comps]
+(defn forward [size ps comps]
   (reduce
-    (fn [syn' prog]
-      (if (= (second prog) size)
-        (combine syn' (synth size prog syn))
-        syn'))
-    syn
+    (fn [syn c]
+      (if (= (second c) size)
+        (combine syn (synth size c ps))
+        syn))
+    ps
     comps))
 
 (defn goal-intersect [g1 g2]
@@ -96,13 +94,14 @@
   (fn [& args]
     (if (vector? (first p)) ; Is program consist of several components
       (try
-        (if (pos? (second (second p)))
-          ((first (first p)) ((first (second p)) (first args))) ; TEMP f(g(h(args)))
-          ((first (first p)) ((first (second p)))))     ; TEMP f(g(h))
-        (catch Throwable t :err))
+        (if (pos? (second (last p)))
+                                 ; TEMP (first args)
+          (reduce #((first %2) %1) (first args) (reverse p)) ; f(g(h(args)))
+          (reduce #((first %2) (if (pos? (second %1)) (first %1) ((first %1)))) (reverse p))) ; f(g(h))
+        (catch Throwable t (do (println t) :err)))
       (let [[callee arity] p]
         (if (pos? arity)
-          (try (apply callee (first args))
+          (try (callee (first args))
             (catch Throwable t :err))
           (callee))))))
 
@@ -110,19 +109,31 @@
   "Evaluates program p given inputs vector in. Returns :err on error."
   (mapv (wrap-p p) in))
 
+(defn match-g [ps g in]
+  "Find programs in ps which match goal g on input in."
+  (some #(= g (eval-p % in)) ps))
+
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (let [usher (init in out)
         syn   (:syn usher)
-        fwd   (forward 0 syn comps)
-        usher (assoc usher :syn fwd)
-        gs    (map #(eval-p % in) fwd)
+        fwd1  (forward 0 syn comps)
+        usher (assoc usher :syn fwd1)
+        gs    (map #(eval-p % in) fwd1)
         usher (update-in usher [:graph :goals] #(apply conj % gs))
         graph (split (:graph usher))
         usher (assoc usher :graph graph)
-        fwd2  (forward 1 fwd comps)
-        gs2   (map #(eval-p % in) fwd2)]
-    gs2))
+        fwd2  (forward 1 fwd1 comps)
+        usher (assoc usher :syn fwd2)
+        gs2   (map #(eval-p % in) fwd2)
+        ; After we generated more goals,
+        ; we searching for programs
+        ; that evaluate to searching goals
+        ; gsat fill find already satisfied goals [true false false] should
+        gsat  (filter #(match-g fwd2 % in) (:goals graph))
+        fwd3  (forward 1 fwd2 comps)
+        gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in) fwd3))]
+    [fwd3 gs3]))
 
 
 (defn zero [] 0)
