@@ -153,9 +153,9 @@
   (run
     [[] [2] [1 2]] ; input
     [0 1 2]        ; output
-    [[zero   0],   ; components with arity a(c)
-     [empty? 1],
-     [inc    1],
-     [first  1],
-     [rest   1],
+    [[zero   0]    ; components with arity a(c)
+     [empty? 1]
+     [inc    1]
+     [first  1]
+     [rest   1]
      [:self  1]])) ; TODO don't pass, should be internal
