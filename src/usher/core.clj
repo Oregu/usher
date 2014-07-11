@@ -93,9 +93,9 @@
       (update-in [:edges] #(conj %1 [(ifgoals 2) rslvr])))))
 
 ; TODO do saturation
-(defn oracle [val in out]
-  ; TODO well-defined relation, wrong
-  (if (> (count (in 2)) (count val))
+(defn oracle [val ind in out]
+  ; TODO well-defined relation, condition is bad too
+  (if (and (> (count (in 2)) (count val)) (not= (in ind) val))
     (reduce
       #(if (= (first %2) val)
         (second %2)
@@ -109,7 +109,7 @@
     (try
       (reduce #(if (pos? (second %2))
                 (if (= (first %2) :self)
-                  (oracle %1 in out)
+                  (oracle %1 ind in out)
                   ((first %2) %1))
                 ((first %2)))
         arg
@@ -120,9 +120,16 @@
   "Evaluates program p given inputs vector in. Returns :err on error."
   (vec (map-indexed #((wrap-p p in out) %2 %1) in)))
 
+(defn equal-g [g1 g2]
+  (every?
+    #(or
+      (= (first %1) (second %1))
+      (some (partial = :?) [(first %1) (second %1)]))
+    (map list g1 g2)))
+
 (defn match-g [ps g in out]
   "Find programs in ps which match goal g on input in."
-  (some #(= g (eval-p % in out)) ps))
+  (some #(equal-g g (eval-p % in out)) ps))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
@@ -143,8 +150,12 @@
         ; gsat fill find already satisfied goals [true false false] should
         gsat  (filter #(match-g fwd2 % in out) (:goals graph))
         fwd3  (forward 1 fwd2 comps)
-        gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd3))]
-    [fwd3 gs3]))
+        gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd3))
+        gsat2 (filter #(match-g fwd3 % in out) (:goals graph))
+        fwd4  (forward 1 fwd3 comps)
+        gs4   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd4))
+        gsat3 (filter #(match-g fwd4 % in out) (:goals graph))]
+    [gsat gsat3]))
 
 
 (defn zero [] 0)
