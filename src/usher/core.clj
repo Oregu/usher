@@ -92,23 +92,37 @@
       (update-in [:edges] #(conj %1 [(ifgoals 1) rslvr]))
       (update-in [:edges] #(conj %1 [(ifgoals 2) rslvr])))))
 
-(defn wrap-p [p]
-  (fn [& args]
+; TODO do saturation
+(defn oracle [val in out]
+  ; TODO well-defined relation, wrong
+  (if (> (count (in 2)) (count val))
+    (reduce
+      #(if (= (first %2) val)
+        (second %2)
+        %1)
+      :noval
+      (map vector in out))
+    :err))
+
+(defn wrap-p [p in out]
+  (fn [arg ind]
     (try
-        (reduce #(if (pos? (second %2))
-                    ((first %2) %1)
-                    ((first %2)))
-          (first args) ; TEMP first args
-          (reverse p)) ; f(g(h(args))) or f(g(h))
+      (reduce #(if (pos? (second %2))
+                (if (= (first %2) :self)
+                  (oracle %1 in out)
+                  ((first %2) %1))
+                ((first %2)))
+        arg
+        (reverse p)) ; f(g(h(args))) or f(g(h))
       (catch Throwable t :err))))
 
-(defn eval-p [p in]
+(defn eval-p [p in out]
   "Evaluates program p given inputs vector in. Returns :err on error."
-  (mapv (wrap-p p) in))
+  (vec (map-indexed #((wrap-p p in out) %2 %1) in)))
 
-(defn match-g [ps g in]
+(defn match-g [ps g in out]
   "Find programs in ps which match goal g on input in."
-  (some #(= g (eval-p % in)) ps))
+  (some #(= g (eval-p % in out)) ps))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
@@ -116,31 +130,32 @@
         syn   (:syn usher)
         fwd1  (forward 0 syn comps)
         usher (assoc usher :syn fwd1)
-        gs    (map #(eval-p % in) fwd1)
+        gs    (map #(eval-p % in out) fwd1)
         usher (update-in usher [:graph :goals] #(apply conj % gs))
         graph (split (:graph usher))
         usher (assoc usher :graph graph)
         fwd2  (forward 1 fwd1 comps)
         usher (assoc usher :syn fwd2)
-        gs2   (map #(eval-p % in) fwd2)
+        gs2   (map #(eval-p % in out) fwd2)
         ; After we generated more goals,
         ; we searching for programs
         ; that evaluate to searching goals
         ; gsat fill find already satisfied goals [true false false] should
-        gsat  (filter #(match-g fwd2 % in) (:goals graph))
+        gsat  (filter #(match-g fwd2 % in out) (:goals graph))
         fwd3  (forward 1 fwd2 comps)
-        gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in) fwd3))]
-    gs3))
+        gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd3))]
+    [fwd3 gs3]))
 
 
 (defn zero [] 0)
 
 (defn do-magic []
   (run
-    [[] [3] [1 2]] ; input
+    [[] [2] [1 2]] ; input
     [0 1 2]        ; output
     [[zero   0],   ; components with arity a(c)
      [empty? 1],
      [inc    1],
      [first  1],
-     [rest   1]]))
+     [rest   1],
+     [:self  1]])) ; TODO don't pass, should be internal
