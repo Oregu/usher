@@ -131,6 +131,44 @@
   "Find programs in ps which match goal g on input in."
   (some #(equal-g g (eval-p % in out)) ps))
 
+(defn edges [res graph]
+  "Find resolver's edges in graph."
+  (let [edges (:edges graph)]
+    (mapv first (filter #(= res (second %)) edges))))
+
+(defn resolve-p [r ps graph in out] ; TODO in out temp
+  "Resolve r with programs ps with given graph."
+  (let [es (edges r graph)
+        g1 (es 0) ; TODO bad
+        g2 (es 1)
+        g3 (es 2)
+        p1 (some #(if (equal-g g1 (eval-p %1 in out)) %1) (seq ps))
+        p2 (some #(if (equal-g g2 (eval-p %1 in out)) %1) (seq ps))
+        p3 (some #(if (equal-g g3 (eval-p %1 in out)) %1) (seq ps))]
+    [:if p1 p2 p3]))
+
+(defn fn-name [f]
+  (first (re-find #"(?<=\$)([^@]+)(?=@)" (str f))))
+
+(defn print-p
+  ([p] (print-p p 0))
+  ([p indent]
+    (do
+      (print (apply str (repeat indent " ")))
+      (if (= :if (first p))
+        (do
+          (print "if ")
+          (print-p (p 1))
+          (println "then")
+          (print-p (p 2) 2)
+          (println "else")
+          (print-p (p 3) 2)
+          (println))
+        (doall
+          (map #(print (if (not= (first %1) :self)
+            (fn-name (first %1))
+            "self") "") p))))))
+
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (let [usher (init in out)
@@ -147,15 +185,18 @@
         ; After we generated more goals,
         ; we searching for programs
         ; that evaluate to searching goals
-        ; gsat fill find already satisfied goals [true false false] should
+        ; gsat will find already satisfied goals [true false false] should
         gsat  (filter #(match-g fwd2 % in out) (:goals graph))
         fwd3  (forward 1 fwd2 comps)
         gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd3))
         gsat2 (filter #(match-g fwd3 % in out) (:goals graph))
         fwd4  (forward 1 fwd3 comps)
         gs4   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd4))
-        gsat3 (filter #(match-g fwd4 % in out) (:goals graph))]
-    [gsat gsat3]))
+        ; Looks like all goals resolved
+        gsat3 (filter #(match-g fwd4 % in out) (:goals graph))
+        rs0   ((get-in usher [:graph :resolvers]) 0)
+        prs0  (resolve-p rs0 fwd4 (:graph usher) in out)]
+    (print-p prs0)))
 
 
 (defn zero [] 0)
