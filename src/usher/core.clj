@@ -3,7 +3,7 @@
 (defn init [in out]
   {:syn   [[[identity 1]]], ; Collection of synthesized programs.
                             ;; (bipartite) Goal graph:
-   :graph {:goals  [out],   ; Goals.
+   :graph {:goals  [out],   ; Goals (programs' valuations).
            :resolvers [],   ; Resolvers connecting goals to subgoals.
            :edges     [],   ; Edges connecting goals and resolvers.
            :root    out},   ; Root, a result we should produce.
@@ -12,7 +12,9 @@
 
 (defn combine [v1 v2]
   "Utility. Combine two vectors."
-  (reduce #(conj %1 %2) v1 v2))
+  (if (empty? v2)
+    v1
+    (apply conj v1 v2)))
 
 (defn gen-p [c p]
   "Generate new program with component (of size 1 for now)
@@ -26,7 +28,7 @@
     ; TODO component should apply to existing goals
     ; TODO and generate final programs by graph walking.
     (mapv #(gen-p component %) programs)
-    [component]))
+    [[component]]))
 
 (defn forward [size ps comps]
   (reduce
@@ -73,9 +75,12 @@
   "SplitGoal rule, adds more resolvers to the goal graph."
   (let [n (count (:root graph))
         gconds  (g-conds (:goals graph))
-        ; TODO do foreach then-else!
+        ; TODO do foreach then-else! Can be empty
         ifgoals (first (map g-then-else gconds))
         rslvr (keyword (str "r" (count (:resolvers graph))))]
+    (println graph)
+    (println "IF" ifgoals)
+    (println "GCONDS" gconds)
     (-> graph
       ; Add goals: gcond, bthen, belse
       (update-in [:goals] #(conj % (ifgoals 0)))
@@ -92,18 +97,16 @@
 
 (defn wrap-p [p]
   (fn [& args]
-    (if (vector? (first p)) ; Is program consist of several components
-      (try
-        (if (pos? (second (last p)))
-                                 ; TEMP (first args)
-          (reduce #((first %2) %1) (first args) (reverse p)) ; f(g(h(args)))
-          (reduce #((first %2) (if (pos? (second %1)) (first %1) ((first %1)))) (reverse p))) ; f(g(h))
-        (catch Throwable t (do (println t) :err)))
-      (let [[callee arity] p]
-        (if (pos? arity)
-          (try (callee (first args))
-            (catch Throwable t :err))
-          (callee))))))
+    (try
+      (if (pos? (second (last p)))
+                             ; TEMP (first args)
+        (reduce #((first %2) %1) (first args) (reverse p)) ; f(g(h(args)))
+        (reduce
+          #(if (pos? (second %2)) ((first %2) %1) ((first %2)))
+          ; Dummy object to call func in case of singleton vector
+          (first args)
+          (reverse p))) ; f(g(h))
+      (catch Throwable t (do (println t) :err)))))
 
 (defn eval-p [p in]
   "Evaluates program p given inputs vector in. Returns :err on error."
