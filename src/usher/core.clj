@@ -74,13 +74,10 @@
 (defn split [graph]
   "SplitGoal rule, adds more resolvers to the goal graph."
   (let [n (count (:root graph))
-        gconds  (g-conds (:goals graph))
+        gconds (g-conds (:goals graph))
         ; TODO do foreach then-else! Can be empty
         ifgoals (first (map g-then-else gconds))
         rslvr (keyword (str "r" (count (:resolvers graph))))]
-    (println graph)
-    (println "IF" ifgoals)
-    (println "GCONDS" gconds)
     (-> graph
       ; Add goals: gcond, bthen, belse
       (update-in [:goals] #(conj % (ifgoals 0)))
@@ -98,15 +95,12 @@
 (defn wrap-p [p]
   (fn [& args]
     (try
-      (if (pos? (second (last p)))
-                             ; TEMP (first args)
-        (reduce #((first %2) %1) (first args) (reverse p)) ; f(g(h(args)))
-        (reduce
-          #(if (pos? (second %2)) ((first %2) %1) ((first %2)))
-          ; Dummy object to call func in case of singleton vector
-          (first args)
-          (reverse p))) ; f(g(h))
-      (catch Throwable t (do (println t) :err)))))
+        (reduce #(if (pos? (second %2))
+                    ((first %2) %1)
+                    ((first %2)))
+          (first args) ; TEMP first args
+          (reverse p)) ; f(g(h(args))) or f(g(h))
+      (catch Throwable t :err))))
 
 (defn eval-p [p in]
   "Evaluates program p given inputs vector in. Returns :err on error."
@@ -136,7 +130,7 @@
         gsat  (filter #(match-g fwd2 % in) (:goals graph))
         fwd3  (forward 1 fwd2 comps)
         gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in) fwd3))]
-    [fwd3 gs3]))
+    gs3))
 
 
 (defn zero [] 0)
