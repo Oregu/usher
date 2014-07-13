@@ -1,12 +1,14 @@
 (ns usher.core)
 
 (defn init [in out]
-  {:syn   [[[identity 1]]], ; Collection of synthesized programs.
+  {:syn   [[{:fn identity
+             :ar 1
+             :name "i"}]],  ; Collection of synthesized programs.
                             ;; (bipartite) Goal graph:
    :graph {:goals  [out],   ; Goals (programs' valuations).
            :resolvers [],   ; Resolvers connecting goals to subgoals.
            :edges     [],   ; Edges connecting goals and resolvers.
-           :root    out},   ; Root, a result we should produce.
+           :root     out}   ; Root, a result we should produce.
                             ;; Set of examples:
    :ex    [in out]})        ; Input and output vectors.
 
@@ -33,7 +35,7 @@
 (defn forward [size ps comps]
   (reduce
     (fn [syn c]
-      (if (= (second c) size)
+      (if (= (:ar c) size)
         (combine syn (synth size c ps))
         syn))
     ps
@@ -87,7 +89,7 @@
       (update-in [:resolvers] #(conj %1 rslvr))
       ; Add 4 edges: (r, gdond), (gdond, r), (bthen, r), (belse, r)
       (update-in [:edges] #(conj %1 [rslvr (ifgoals 0)]))
-      ; TODO here should indexes of goals and resolvers
+      ; TODO here should be indexes of goals and resolvers
       (update-in [:edges] #(conj %1 [(ifgoals 0) rslvr]))
       (update-in [:edges] #(conj %1 [(ifgoals 1) rslvr]))
       (update-in [:edges] #(conj %1 [(ifgoals 2) rslvr])))))
@@ -101,17 +103,17 @@
         (second %2)
         %1)
       :noval
-      (map vector in out))
+      (map list in out))
     :err))
 
 (defn wrap-p [p in out]
   (fn [arg ind]
     (try
-      (reduce #(if (pos? (second %2))
-                (if (= (first %2) :self)
+      (reduce #(if (pos? (:ar %2))
+                (if (= (:fn %2) :self)
                   (oracle %1 ind in out)
-                  ((first %2) %1))
-                ((first %2)))
+                  ((:fn %2) %1))
+                ((:fn %2)))
         arg
         (reverse p)) ; f(g(h(args))) or f(g(h))
       (catch Throwable t :err))))
@@ -147,9 +149,6 @@
         p3 (some #(if (equal-g g3 (eval-p %1 in out)) %1) (seq ps))]
     [:if p1 p2 p3]))
 
-(defn fn-name [f]
-  (first (re-find #"(?<=\$)([^@]+)(?=@)" (str f))))
-
 (defn print-p
   ([p] (print-p p 0))
   ([p indent]
@@ -159,15 +158,15 @@
         (do
           (print "if ")
           (print-p (p 1))
-          (println "then")
-          (print-p (p 2) 2)
-          (println "else")
-          (print-p (p 3) 2)
+          (println)
+          (print "  then ")
+          (print-p (p 2))
+          (println)
+          (print "  else ")
+          (print-p (p 3))
           (println))
         (doall
-          (map #(print (if (not= (first %1) :self)
-            (fn-name (first %1))
-            "self") "") p))))))
+          (map #(print (:name %) "") p))))))
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
@@ -188,10 +187,12 @@
         ; gsat will find already satisfied goals [true false false] should
         gsat  (filter #(match-g fwd2 % in out) (:goals graph))
         fwd3  (forward 1 fwd2 comps)
-        gs3   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd3))
+        gs3   (filter (fn [r] (some #(not= :err %) r))
+                      (map #(eval-p % in out) fwd3))
         gsat2 (filter #(match-g fwd3 % in out) (:goals graph))
         fwd4  (forward 1 fwd3 comps)
-        gs4   (filter (fn [r] (some #(not= :err %) r)) (map #(eval-p % in out) fwd4))
+        gs4   (filter (fn [r] (some #(not= :err %) r))
+                      (map #(eval-p % in out) fwd4))
         ; Looks like all goals resolved
         gsat3 (filter #(match-g fwd4 % in out) (:goals graph))
         rs0   ((get-in usher [:graph :resolvers]) 0)
@@ -203,11 +204,12 @@
 
 (defn do-magic []
   (run
-    [[] [2] [1 2]] ; input
-    [0 1 2]        ; output
-    [[zero   0]    ; components with arity a(c)
-     [empty? 1]
-     [inc    1]
-     [first  1]
-     [rest   1]
-     [:self  1]])) ; TODO don't pass, should be internal
+    [[] [2] [1 2]]                        ; input
+    [0 1 2]                               ; output
+    [{:fn zero   :ar 0 :name "zero"  }    ; components with arity a(c)
+     {:fn empty? :ar 1 :name "empty?"}
+     {:fn inc    :ar 1 :name "inc"   }
+     {:fn first  :ar 1 :name "first" }
+     {:fn rest   :ar 1 :name "rest"  }
+     ; TODO don't pass, self should be internal
+     {:fn :self  :ar 1 :name "self"  }]))
