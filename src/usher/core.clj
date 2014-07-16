@@ -1,4 +1,7 @@
-(ns usher.core)
+(ns usher.core
+  (:use clojure.pprint))
+
+(def ^:dynamic *usher-debug* false)
 
 (defn init [in out]
   {:syn   [[{:fn identity
@@ -18,92 +21,18 @@
     v1
     (apply conj v1 v2)))
 
-(defn gen-p [c p]
-  "Generate new program with component (of size 1 for now)
-   and existing program."
-  (vec (cons c p)))
+;; Saturate
 
-(defn synth [size component programs]
-  "Synthesizes new program by applying components of given size
-   to existing programs."
-  (if (pos? size)
-    ; TODO component should apply to existing goals
-    ; TODO and generate final programs by graph walking.
-    (mapv #(gen-p component %) programs)
-    [[component]]))
-
-(defn forward [size ps comps]
-  (reduce
-    (fn [syn c]
-      (if (= (:ar c) size)
-        (combine syn (synth size c ps))
-        syn))
-    ps
-    comps))
-
-(defn goal-intersect [g1 g2]
-  "Returns boolean vector with truth in places of intersected positions.
-  If no interse found, returns nil."
-  (let [inter (mapv = g1 g2)]
-    (if (some true? inter) inter)))
-
-(defn g-intersects [g goals]
-  "Returns bool vector of intersections between goal g and each of the goals.
-   (With g.)"
-  (reduce #(if-let [inter (goal-intersect g %2)]
-            (conj %1 [inter g])
-            %1)
-          [] goals))
-
-(defn g-conds [goals]
-  "Produces _arbitrary_ cond goals."
-  (let [upto (dec (count goals))]
-    (loop [conds [] ind 0]
-      (if (> ind upto)
-        conds
-        (recur
-          (combine conds (g-intersects (goals ind) (subvec goals (inc ind))))
-          (inc ind))))))
-
-(defn g-then-else [cond+g]
-  "For a cond goal vector build bthen and belse goals.
-   Return [condg bthen belse]."
-  (let [[cnd g] cond+g
-        bthen (map-indexed (fn [ind itm] (if (true?  itm) (g ind) :?)) cnd)
-        belse (map-indexed (fn [ind itm] (if (false? itm) (g ind) :?)) cnd)]
-    [cnd (vec bthen) (vec belse)]))
-
-(defn split [graph]
-  "SplitGoal rule, adds more resolvers to the goal graph."
-  (let [n (count (:root graph))
-        gconds (g-conds (:goals graph))
-        ; TODO do foreach then-else! Can be empty
-        ifgoals (first (map g-then-else gconds))
-        rslvr (keyword (str "r" (count (:resolvers graph))))]
-    (-> graph
-      ; Add goals: gcond, bthen, belse
-      (update-in [:goals] #(conj % (ifgoals 0)))
-      (update-in [:goals] #(conj % (ifgoals 1)))
-      (update-in [:goals] #(conj % (ifgoals 2)))
-      ; Add fresh resolver
-      (update-in [:resolvers] #(conj %1 rslvr))
-      ; Add 4 edges: (r, gdond), (gdond, r), (bthen, r), (belse, r)
-      (update-in [:edges] #(conj %1 [rslvr (ifgoals 0)]))
-      ; TODO here should be indexes of goals and resolvers
-      (update-in [:edges] #(conj %1 [(ifgoals 0) rslvr]))
-      (update-in [:edges] #(conj %1 [(ifgoals 1) rslvr]))
-      (update-in [:edges] #(conj %1 [(ifgoals 2) rslvr])))))
-
-; TODO do saturation
+;; TODO do saturation
 (defn oracle [val ind in out]
-  ; TODO well-defined relation, condition is bad too
-  (if (and (> (count (in 2)) (count val)) (not= (in ind) val))
+  ;; TODO well-defined relation, condition is wrong too. Rethink
+  (if (and (> (count (last in)) (count val)) (not= (in ind) val))
     (reduce
-      #(if (= (first %2) val)
+     #(if (= (first %2) val)
         (second %2)
         %1)
-      :noval
-      (map list in out))
+     :noval
+     (map list in out))
     :err))
 
 (defn wrap-p [p in out]
@@ -114,59 +43,172 @@
                   (oracle %1 ind in out)
                   ((:fn %2) %1))
                 ((:fn %2)))
-        arg
-        (reverse p)) ; f(g(h(args))) or f(g(h))
+              arg
+              (reverse p)) ; f(g(h(args))) or f(g(h))
       (catch Throwable t :err))))
 
-(defn eval-p [p in out]
+(defn eval-p [p in out] ; TODO TEMP in out, rethink
   "Evaluates program p given inputs vector in. Returns :err on error."
   (vec (map-indexed #((wrap-p p in out) %2 %1) in)))
 
+;; Forward
+
+;; TODO only size 0 and 1 supported
+(defn gen-p [c p]
+  "Generate new program with component and existing programs."
+  (vec (cons c p)))
+
+(defn synth-p [size component programs]
+  "Synthesizes new program by applying components of given size
+  to existing programs."
+  (if (pos? size)
+    ;; TODO component should apply to existing goals
+    ;; TODO and generate final programs by graph walking.
+    (mapv #(gen-p component %) programs)
+    [[component]]))
+
+(defn forward [size ps comps]
+  ;; TODO don't generate progs that return all errors
+  ;; TODO Store evaluations for speed
+  (reduce
+   (fn [syn c]
+     (if (= (:ar c) size)
+       (combine syn (synth-p size c ps))
+       syn))
+   ps
+   comps))
+
+;; Split goal
+
+(defn g-intersect [g1 g2]
+  "Returns boolean vector with truth in places of intersected positions.
+  If no interse found, returns nil."
+  (let [inter (mapv = g1 g2)]
+    (if (and (some true? inter) (not (every? true? inter))) inter)))
+
+(defn g-intersects [g goals]
+  "Returns bool vector of intersections between goal g and each of the goals.
+  (With g.)"
+  (reduce #(if-let [inter (g-intersect g %2)]
+             (conj %1 [inter g])
+             %1)
+          [] goals))
+
+(defn g-conds [goals evals]
+  "Produces _arbitrary_ cond goals."
+  (reduce (fn [conds goal]
+            (if-let [g-inters (seq (g-intersects goal evals))]
+              (apply conj conds g-inters)
+              conds))
+          []
+          goals))
+
+(defn g-then-else [cond+g]
+  "For a cond goal vector, build bthen and belse goals.
+  Return [condg bthen belse]."
+  (let [[cnd g] cond+g
+        bthen (map-indexed (fn [ind itm] (if (true?  itm) (g ind) :?)) cnd)
+        belse (map-indexed (fn [ind itm] (if (false? itm) (g ind) :?)) cnd)]
+    (if (or (= [:? :? :?] belse) (= [:? :? :?] bthen))
+      nil ; TODO We don't want 'don't care' goals.
+          ; Need not generate them at all
+      [g cnd (vec bthen) (vec belse)])))
+
+(defn add-resolver [ifgoals graph]
+  "Returns a new graph with resolvers for ifgoals."
+  (let [rslvr (keyword (str "r" (count (:resolvers graph))))]
+    (-> graph
+      ; Add goals: gcond, bthen, belse
+      (update-in [:goals] #(conj % (ifgoals 1)))
+      (update-in [:goals] #(conj % (ifgoals 2)))
+      (update-in [:goals] #(conj % (ifgoals 3)))
+      ; Add fresh resolver
+      (update-in [:resolvers] #(conj % rslvr))
+      ; Add 4 edges: (r, g), (gcond, r), (bthen, r), (belse, r)
+      (update-in [:edges] #(conj % [rslvr (ifgoals 0)]))
+      ; TODO here should be indexes of goals and resolvers
+      (update-in [:edges] #(conj % [(ifgoals 1) rslvr]))
+      (update-in [:edges] #(conj % [(ifgoals 2) rslvr]))
+      (update-in [:edges] #(conj % [(ifgoals 3) rslvr])))))
+
+(defn split-g [usher]
+  "SplitGoal rule, adds more resolvers to the goal graph."
+  (let [graph (:graph usher)
+        n (count (:root graph))
+        ex (:ex usher)
+        in  (ex 0)
+        out (ex 1)
+        gconds (g-conds (:goals graph)
+                        (map #(eval-p % in out) (:syn usher)))
+        ifgoals (map g-then-else gconds)]
+    (reduce #(if %2 (add-resolver %2 %1) %1) graph ifgoals)))
+
+;; Resolve
+
 (defn equal-g [g1 g2]
   (every?
-    #(or
-      (= (first %1) (second %1))
-      (some (partial = :?) [(first %1) (second %1)]))
-    (map list g1 g2)))
+   #(or
+     (= (first %1) (second %1))
+     (some (partial = :?) [(first %1) (second %1)]))
+   (map list g1 g2)))
 
 (defn match-g [ps g in out]
   "Find programs in ps which match goal g on input in."
   (some #(equal-g g (eval-p % in out)) ps))
 
-(defn edges [res graph]
+(defn edges [rslvr graph]
   "Find resolver's edges in graph."
   (let [edges (:edges graph)]
-    (mapv first (filter #(= res (second %)) edges))))
+    (reduce #(if (= rslvr (first %2))
+               (conj %1 (second %2))
+               (if (= rslvr (second %2))
+                 (conj %1 (first %2))
+                 %1)) [] edges)))
 
-(defn resolve-p [r ps graph in out] ; TODO in out temp
+(defn resolve-p [r usher]
   "Resolve r with programs ps with given graph."
-  (let [es (edges r graph)
-        g1 (es 0) ; TODO bad
-        g2 (es 1)
-        g3 (es 2)
-        p1 (some #(if (equal-g g1 (eval-p %1 in out)) %1) (seq ps))
-        p2 (some #(if (equal-g g2 (eval-p %1 in out)) %1) (seq ps))
-        p3 (some #(if (equal-g g3 (eval-p %1 in out)) %1) (seq ps))]
-    [:if p1 p2 p3]))
+  (let [es (edges r (:graph usher))
+        rg (es 0)
+        g1 (es 1) ; TODO bad
+        g2 (es 2)
+        g3 (es 3)
+        in  ((:ex usher) 0)
+        out ((:ex usher) 1)
+        ps (:syn usher)
+        p1 (some #(if (equal-g g1 (eval-p %1 in out)) %1) ps)
+        p2 (some #(if (equal-g g2 (eval-p %1 in out)) %1) ps)
+        p3 (some #(if (equal-g g3 (eval-p %1 in out)) %1) ps)]
+    ;; TODO rg= is a temp termination condition
+    ;; This should check for resolvance of some resolver,
+    ;; Not termination.
+    (if (and p1 p2 p3
+             (= rg (:root (:graph usher))))
+      [:if p1 p2 p3])))
+
+;; Termination
+
+;; TODO termination is when root goal resolved.
 
 (defn print-p
   ([p] (print-p p 0))
   ([p indent]
-    (do
-      (print (apply str (repeat indent " ")))
-      (if (= :if (first p))
-        (do
-          (print "if ")
-          (print-p (p 1))
-          (println)
-          (print "  then ")
-          (print-p (p 2))
-          (println)
-          (print "  else ")
-          (print-p (p 3))
-          (println))
-        (doall
+     (do
+       (print (apply str (repeat indent " ")))
+       (if (= :if (first p))
+         (do
+           (print "if ")
+           (print-p (p 1))
+           (println)
+           (print "  then ")
+           (print-p (p 2))
+           (println)
+           (print "  else ")
+           (print-p (p 3))
+           (println))
+         (doall
           (map #(print (:name %) "") p))))))
+
+;; Entry-point
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
@@ -176,7 +218,7 @@
         usher (assoc usher :syn fwd1)
         gs    (map #(eval-p % in out) fwd1)
         usher (update-in usher [:graph :goals] #(apply conj % gs))
-        graph (split (:graph usher))
+        graph (split-g usher)
         usher (assoc usher :graph graph)
         fwd2  (forward 1 fwd1 comps)
         usher (assoc usher :syn fwd2)
@@ -184,32 +226,56 @@
         ; After we generated more goals,
         ; we searching for programs
         ; that evaluate to searching goals
-        ; gsat will find already satisfied goals [true false false] should
-        gsat  (filter #(match-g fwd2 % in out) (:goals graph))
+        ; gsat will find already satisfied goals
+        ; gsat  (filter #(match-g fwd2 % in out) (:goals graph))
         fwd3  (forward 1 fwd2 comps)
         gs3   (filter (fn [r] (some #(not= :err %) r))
                       (map #(eval-p % in out) fwd3))
-        gsat2 (filter #(match-g fwd3 % in out) (:goals graph))
+        ; gsat2 (filter #(match-g fwd3 % in out) (:goals graph))
         fwd4  (forward 1 fwd3 comps)
         gs4   (filter (fn [r] (some #(not= :err %) r))
                       (map #(eval-p % in out) fwd4))
         ; Looks like all goals resolved
-        gsat3 (filter #(match-g fwd4 % in out) (:goals graph))
+        ; gsat3 (filter #(match-g fwd4 % in out) (:goals graph))
         rs0   ((get-in usher [:graph :resolvers]) 0)
-        prs0  (resolve-p rs0 fwd4 (:graph usher) in out)]
+        usher (assoc usher :syn fwd4)
+        prs0  (resolve-p rs0 usher)]
     (print-p prs0)))
+
+(defn run* [in out comps]
+  {:pre [(= (count in) (count out))]}
+  (loop [usher (init in out)
+         size  0]
+    (let [fwd   (forward size (:syn usher) comps)
+          usher (assoc usher :syn fwd)
+          graph (split-g usher)
+          usher (assoc usher :graph graph)
+          rslvd (reduce
+                 (fn [ps rslvr]
+                   (if-let [p (resolve-p rslvr usher)]
+                     (conj ps p)
+                     ps))
+                 []
+                 (get-in usher [:graph :resolvers]))]
+      (if *usher-debug* (pprint usher))
+
+      (if (seq rslvd)
+        (doall (print-p (first rslvd)))
+        (recur usher
+               ;; TODO size
+               1 #_(inc size))))))
 
 
 (defn zero [] 0)
 
 (defn do-magic []
-  (run
-    [[] [2] [1 2]]                        ; input
-    [0 1 2]                               ; output
-    [{:fn zero   :ar 0 :name "zero"  }    ; components with arity a(c)
+  (run*
+    [[ ] [2] [1 2]]                    ; input
+    [ 0   1    2  ]                    ; output
+    [{:fn zero   :ar 0 :name "zero"  } ; components with arity a(c)
      {:fn empty? :ar 1 :name "empty?"}
      {:fn inc    :ar 1 :name "inc"   }
      {:fn first  :ar 1 :name "first" }
      {:fn rest   :ar 1 :name "rest"  }
-     ; TODO don't pass, self should be internal
+     ; TODO don't pass, self should be internal!
      {:fn :self  :ar 1 :name "self"  }]))
