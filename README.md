@@ -1,6 +1,6 @@
 Usher
 =====
-Recursive program synthesis.  
+Recursive program synthesis from example.  
 
 Clojure implementation of [paper](http://research.microsoft.com/en-us/um/people/sumitg/pubs/cav13.pdf).
 
@@ -14,6 +14,9 @@ Run it with
 lein repl
 user> (use 'usher.core)
 user> (do-magic)
+if empty? i
+  then zero
+  else inc self rest i
 ```
 
 To do
