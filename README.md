@@ -14,9 +14,6 @@ Run it with
 lein repl
 user> (use 'usher.core)
 user> (do-magic)
-if empty? i
-  then zero
-  else inc self rest i
 ```
 
 To do
