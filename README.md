@@ -9,6 +9,13 @@ What it can do
 It can generate length recursive function within 15 seconds. Very alpha.  
 Consider not working.
 
+Run it with
+```clojure
+lein repl
+user> (use 'usher.core)
+user> (do-magic)
+```
+
 To do
 -----
 - [ ] Generate Fibonacci program.
