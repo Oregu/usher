@@ -210,38 +210,6 @@
 
 ;; Entry-point
 
-(defn run [in out comps]
-  {:pre [(= (count in) (count out))]}
-  (let [usher (init in out)
-        syn   (:syn usher)
-        fwd1  (forward 0 syn comps)
-        usher (assoc usher :syn fwd1)
-        gs    (map #(eval-p % in out) fwd1)
-        usher (update-in usher [:graph :goals] #(apply conj % gs))
-        graph (split-g usher)
-        usher (assoc usher :graph graph)
-        fwd2  (forward 1 fwd1 comps)
-        usher (assoc usher :syn fwd2)
-        gs2   (map #(eval-p % in out) fwd2)
-        ; After we generated more goals,
-        ; we searching for programs
-        ; that evaluate to searching goals
-        ; gsat will find already satisfied goals
-        ; gsat  (filter #(match-g fwd2 % in out) (:goals graph))
-        fwd3  (forward 1 fwd2 comps)
-        gs3   (filter (fn [r] (some #(not= :err %) r))
-                      (map #(eval-p % in out) fwd3))
-        ; gsat2 (filter #(match-g fwd3 % in out) (:goals graph))
-        fwd4  (forward 1 fwd3 comps)
-        gs4   (filter (fn [r] (some #(not= :err %) r))
-                      (map #(eval-p % in out) fwd4))
-        ; Looks like all goals resolved
-        ; gsat3 (filter #(match-g fwd4 % in out) (:goals graph))
-        rs0   ((get-in usher [:graph :resolvers]) 0)
-        usher (assoc usher :syn fwd4)
-        prs0  (resolve-p rs0 usher)]
-    (print-p prs0)))
-
 (defn run* [in out comps]
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)
@@ -268,7 +236,8 @@
 
 (defn zero [] 0)
 
-(defn do-magic []
+(defn magic-length []
+  "Generates length recursive function."
   (run*
     [[ ] [2] [1 2]]                    ; input
     [ 0   1    2  ]                    ; output
@@ -278,4 +247,12 @@
      {:fn first  :ar 1 :name "first" }
      {:fn rest   :ar 1 :name "rest"  }
      ; TODO don't pass, self should be internal!
-     {:fn :self  :ar 1 :name "self"  }]))
+     {:fn :self  :ar 1 :name "length"}]))
+
+(defn magic-fib []
+  "Generate Fibonacci program."
+  (run*
+   [0 1 2 3 4 5 6]
+   [0 1 1 2 3 5 8]
+   [{:fn +     :ar 2 :name "+"  }
+    {:fn :self :ar 1 :name "fib"}]))
