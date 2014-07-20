@@ -55,17 +55,17 @@
 ;; Forward
 
 ;; TODO only size 0 and 1 supported
-(defn gen-p [c p]
+(defn gen-p [p c]
   "Generate new program with component and existing programs."
   (cons c p))
 
-(defn synth-p [size component programs]
+(defn synth-p [size programs component]
   "Synthesizes new program by applying components of given size
   to existing programs."
   (if (pos? size)
-    (mapv (fn [pr] {:prog (gen-p component (:prog pr))})
-          programs)
-    [{:prog (list component)}]))
+    (map (fn [pr] {:prog (gen-p (:prog pr) component)})
+         programs)
+    (list {:prog (list component)})))
 
 (defn forward [size ps comps]
   ;; TODO don't generate progs that return all errors
@@ -73,7 +73,7 @@
   (reduce
    (fn [syn c]
      (if (= (:ar c) size)
-       (let [synth (synth-p size c ps)]
+       (let [synth (synth-p size ps c)]
          (combine syn synth))
        syn))
    ps
