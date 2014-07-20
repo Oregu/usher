@@ -23,8 +23,7 @@
            (list {:prog [fst id] :val '(1 2 3)} progid)))
 
     (is (= (forward 1 (list {:prog [zr] :val '(0 0 0)} progid) [inc] inv [])
-           (list {:prog [inc id] :val (list :err :err :err)}
-                 {:prog [inc zr] :val '(1 1 1)}
+           (list {:prog [inc zr] :val '(1 1 1)}
                  {:prog [zr] :val '(0 0 0)}
                  progid)))))
 

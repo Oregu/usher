@@ -18,10 +18,9 @@
 
 (defn combine [v1 v2]
   "Utility. Combine two vectors."
-  (do (println "V1V2" v1 v2)
-    (if (empty? v2)
-      v1
-      (apply conj v1 v2))))
+  (if (empty? v2)
+    v1
+    (apply conj v1 v2)))
 
 ;; Saturate
 
@@ -73,9 +72,11 @@
    (fn [syn c]
      (if (= (:ar c) size)
        (let [synth (synth-p size ps c)
-             evald (map #(assoc %1 :val
-                                (eval-p (:prog %1) in out))
-                        synth)]
+             evald (reduce #(let [ev (eval-p (:prog %2) in out)]
+                              (if (every? (partial = :err) ev)
+                                %1
+                                (conj %1 (assoc %2 :val ev))))
+                           [] synth)]
          (combine syn evald))
        syn))
    ps
