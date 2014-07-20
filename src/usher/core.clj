@@ -4,9 +4,10 @@
 (def ^:dynamic *usher-debug* false)
 
 (defn init [in out]
-  {:syn   [[{:fn identity
-             :ar 1
-             :name "i"}]],  ; Collection of synthesized programs.
+  {:syn   [{:prog [{:fn identity
+                    :ar 1
+                    :name "i"}]
+            :val in}],      ; Collection of synthesized programs.
                             ;; (bipartite) Goal graph:
    :graph {:goals  [out],   ; Goals (programs' valuations).
            :resolvers [],   ; Resolvers connecting goals to subgoals.
@@ -56,16 +57,15 @@
 ;; TODO only size 0 and 1 supported
 (defn gen-p [c p]
   "Generate new program with component and existing programs."
-  (vec (cons c p)))
+  (cons c p))
 
 (defn synth-p [size component programs]
   "Synthesizes new program by applying components of given size
   to existing programs."
   (if (pos? size)
-    ;; TODO component should apply to existing goals
-    ;; TODO and generate final programs by graph walking.
-    (mapv #(gen-p component %) programs)
-    [[component]]))
+    (mapv (fn [pr] {:prog (gen-p component (:prog pr))})
+          programs)
+    [{:prog (list component)}]))
 
 (defn forward [size ps comps]
   ;; TODO don't generate progs that return all errors
@@ -73,7 +73,8 @@
   (reduce
    (fn [syn c]
      (if (= (:ar c) size)
-       (combine syn (synth-p size c ps))
+       (let [synth (synth-p size c ps)]
+         (combine syn synth))
        syn))
    ps
    comps))
@@ -139,7 +140,7 @@
         in  (ex 0)
         out (ex 1)
         gconds (g-conds (:goals graph)
-                        (map #(eval-p % in out) (:syn usher)))
+                        (map #(eval-p (:prog %) in out) (:syn usher)))
         ifgoals (map g-then-else gconds)]
     (reduce #(if %2 (add-resolver %2 %1) %1) graph ifgoals)))
 
@@ -175,9 +176,9 @@
         in  ((:ex usher) 0)
         out ((:ex usher) 1)
         ps (:syn usher)
-        p1 (some #(if (equal-g g1 (eval-p %1 in out)) %1) ps)
-        p2 (some #(if (equal-g g2 (eval-p %1 in out)) %1) ps)
-        p3 (some #(if (equal-g g3 (eval-p %1 in out)) %1) ps)]
+        p1 (some #(if (equal-g g1 (eval-p (:prog %1) in out)) %1) ps)
+        p2 (some #(if (equal-g g2 (eval-p (:prog %1) in out)) %1) ps)
+        p3 (some #(if (equal-g g3 (eval-p (:prog %1) in out)) %1) ps)]
     ;; TODO rg= is a temp termination condition
     ;; This should check for resolvance of some resolver,
     ;; Not termination.
@@ -197,13 +198,13 @@
        (if (= :if (first p))
          (do
            (print "if ")
-           (print-p (p 1))
+           (print-p (:prog (p 1)))
            (println)
            (print "  then ")
-           (print-p (p 2))
+           (print-p (:prog (p 2)))
            (println)
            (print "  else ")
-           (print-p (p 3))
+           (print-p (:prog (p 3)))
            (println))
          (doall
           (map #(print (:name %) "") p))))))
