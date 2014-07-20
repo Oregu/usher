@@ -143,7 +143,7 @@
         in  (ex 0)
         out (ex 1)
         gconds (g-conds (:goals graph)
-                        (map #(eval-p (:prog %) in out) (:syn usher)))
+                        (map :val (:syn usher)))
         ifgoals (map g-then-else gconds)]
     (reduce #(if %2 (add-resolver %2 %1) %1) graph ifgoals)))
 
@@ -158,7 +158,7 @@
 
 (defn match-g [ps g in out]
   "Find programs in ps which match goal g on input in."
-  (some #(equal-g g (eval-p % in out)) ps))
+  (some #(equal-g g (:val %)) ps))
 
 (defn edges [rslvr graph]
   "Find resolver's edges in graph."
@@ -176,12 +176,10 @@
         g1 (es 1) ; TODO bad
         g2 (es 2)
         g3 (es 3)
-        in  ((:ex usher) 0)
-        out ((:ex usher) 1)
         ps (:syn usher)
-        p1 (some #(if (equal-g g1 (eval-p (:prog %1) in out)) %1) ps)
-        p2 (some #(if (equal-g g2 (eval-p (:prog %1) in out)) %1) ps)
-        p3 (some #(if (equal-g g3 (eval-p (:prog %1) in out)) %1) ps)]
+        p1 (some #(if (equal-g g1 (:val %1)) %1) ps)
+        p2 (some #(if (equal-g g2 (:val %1)) %1) ps)
+        p3 (some #(if (equal-g g3 (:val %1)) %1) ps)]
     ;; TODO rg= is a temp termination condition
     ;; This should check for resolvance of some resolver,
     ;; Not termination.
