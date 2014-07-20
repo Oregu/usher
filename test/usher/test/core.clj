@@ -3,22 +3,21 @@
         [clojure.test]))
 
 (deftest t-forward
-  (is (= (gen-p [{:fn first} {:fn identity}] {:fn inc})
-         (list {:fn inc} {:fn first} {:fn identity})))
+  (let [id  {:prog [{:fn identity :ar 1}]}
+        zr  {:fn zero  :ar 0}
+        fst {:fn first :ar 1}
+        inc {:fn inc }]
 
-  (is (= (synth-p 0
-                  [{:fn identity :ar 1}]
-                  {:fn zero :ar 0})
-         (list {:prog [{:fn zero :ar 0}]})))
+    (is (= (gen-p [zr fst] inc)
+           (list inc zr fst)))
 
-  (is (= (forward 0
-                  (list {:prog [{:fn identity :ar 1}]})
-                  [{:fn zero :ar 0} {:fn first :ar 1}])
-         (list {:prog [{:fn zero :ar 0}]}
-               {:prog [{:fn identity :ar 1}]})))
+    (is (= (synth-p 0
+                    [{:fn identity :ar 1}]
+                    {:fn zero :ar 0})
+           (list {:prog [{:fn zero :ar 0}]})))
 
-  (is (= (forward 1
-                  (list {:prog [{:fn identity :ar 1}]})
-                  [{:fn zero :ar 0} {:fn first :ar 1}])
-         (list {:prog [{:fn first :ar 1} {:fn identity :ar 1}]}
-               {:prog [{:fn identity :ar 1}]}))))
+    (is (= (forward 0 (list id) [zr fst])
+           (list {:prog [zr]} id)))
+
+    (is (= (forward 1 (list {:prog [id]}) [zr fst])
+          (list {:prog [fst id]} {:prog [id]})))))
