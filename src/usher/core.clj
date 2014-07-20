@@ -18,9 +18,10 @@
 
 (defn combine [v1 v2]
   "Utility. Combine two vectors."
-  (if (empty? v2)
-    v1
-    (apply conj v1 v2)))
+  (do (println "V1V2" v1 v2)
+    (if (empty? v2)
+      v1
+      (apply conj v1 v2))))
 
 ;; Saturate
 
@@ -50,7 +51,7 @@
 
 (defn eval-p [p in out] ; TODO TEMP in out, rethink
   "Evaluates program p given inputs vector in. Returns :err on error."
-  (vec (map-indexed #((wrap-p p in out) %2 %1) in)))
+  (map-indexed #((wrap-p p in out) %2 %1) in))
 
 ;; Forward
 
@@ -67,14 +68,15 @@
          programs)
     (list {:prog (list component)})))
 
-(defn forward [size ps comps]
-  ;; TODO don't generate progs that return all errors
-  ;; TODO Store evaluations for speed
+(defn forward [size ps comps in out] ; TODO temp in out, do better
   (reduce
    (fn [syn c]
      (if (= (:ar c) size)
-       (let [synth (synth-p size ps c)]
-         (combine syn synth))
+       (let [synth (synth-p size ps c)
+             evald (map #(assoc %1 :val
+                                (eval-p (:prog %1) in out))
+                        synth)]
+         (combine syn evald))
        syn))
    ps
    comps))
@@ -215,7 +217,7 @@
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)
          size  0]
-    (let [fwd   (forward size (:syn usher) comps)
+    (let [fwd   (forward size (:syn usher) comps in out)
           usher (assoc usher :syn fwd)
           graph (split-g usher)
           usher (assoc usher :graph graph)
