@@ -2,6 +2,8 @@
   (:use [usher.core]
         [clojure.test]))
 
+(def zero (constantly 0))
+
 (deftest t-forward
   (let [id  {:fn identity :ar 1}
         zr  {:fn zero     :ar 0}

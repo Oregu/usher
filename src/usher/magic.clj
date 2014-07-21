@@ -1,5 +1,6 @@
 (ns usher.magic
-  (:use usher.core))
+  (:use [usher.core]
+        [usher.util]))
 
 (defn zero [] 0)
 
