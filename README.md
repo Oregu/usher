@@ -24,13 +24,13 @@ if empty? i
 Which is a recursively defined length program generated with the following input:
 ```clojure
 (run
-   [[ ] [2] [1 2]]                    ; input
-   [ 0   1    2  ]                    ; output
-   [{:fn zero   :ar 0 :name "zero"  } ; components
-    {:fn empty? :ar 1 :name "empty?"}
-    {:fn inc    :ar 1 :name "inc"   }
-    {:fn first  :ar 1 :name "first" }
-    {:fn rest   :ar 1 :name "rest"  }}])
+   [[ ] [2] [1 2]]     ; input examples
+   [ 0   1    2  ]     ; output examples
+   [{:fn zero   :ar 0} ; components
+    {:fn empty? :ar 1}
+    {:fn inc    :ar 1}
+    {:fn first  :ar 1}
+    {:fn rest   :ar 1}}])
 ```
 
 To do
