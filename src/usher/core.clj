@@ -29,9 +29,7 @@
   ;; TODO well-defined relation, condition is wrong too. Rethink
   (if (and (> (count (last in)) (count val)) (not= (in ind) val))
     (reduce
-     #(if (= (first %2) val)
-        (second %2)
-        %1)
+     #(if (= (first %2) val) (second %2) %1)
      :noval
      (map list in out))
     :err))
@@ -40,10 +38,10 @@
   (fn [arg ind]
     (try
       (reduce #(if (pos? (:ar %2))
-                (if (= (:fn %2) :self)
-                  (oracle %1 ind in out)
-                  ((:fn %2) %1))
-                ((:fn %2)))
+                 (if (= (:fn %2) :self)
+                   (oracle %1 ind in out)
+                   ((:fn %2) %1))
+                 ((:fn %2)))
               arg
               (reverse p)) ; f(g(h(args))) or f(g(h))
       (catch Throwable t :err))))
@@ -63,8 +61,7 @@
   "Synthesizes new program by applying components of given size
   to existing programs."
   (if (pos? size)
-    (map (fn [pr] {:prog (gen-p (:prog pr) component)})
-         programs)
+    (map (fn [pr] {:prog (gen-p (:prog pr) component)}) programs)
     (list {:prog (list component)})))
 
 (defn forward [size ps comps in out] ; TODO temp in out, do better
@@ -212,7 +209,7 @@
 
 ;; Entry-point
 
-(defn run* [in out comps]
+(defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)
          size  0]
@@ -230,31 +227,7 @@
       (if *usher-debug* (pprint usher))
 
       (if (seq rslvd)
-        (doall (print-p (first rslvd)))
+        (first rslvd)
         (recur usher
                ;; TODO size
                1 #_(inc size))))))
-
-
-(defn zero [] 0)
-
-(defn magic-length []
-  "Generates length recursive function."
-  (run*
-    [[ ] [2] [1 2]]                    ; input
-    [ 0   1    2  ]                    ; output
-    [{:fn zero   :ar 0 :name "zero"  } ; components with arity a(c)
-     {:fn empty? :ar 1 :name "empty?"}
-     {:fn inc    :ar 1 :name "inc"   }
-     {:fn first  :ar 1 :name "first" }
-     {:fn rest   :ar 1 :name "rest"  }
-     ; TODO don't pass, self should be internal!
-     {:fn :self  :ar 1 :name "length"}]))
-
-(defn magic-fib []
-  "Generate Fibonacci program."
-  (run*
-   [0 1 2 3 4 5 6]
-   [0 1 1 2 3 5 8]
-   [{:fn +     :ar 2 :name "+"  }
-    {:fn :self :ar 1 :name "fib"}]))
