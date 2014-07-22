@@ -57,25 +57,24 @@
   "Generate new program with component and existing programs."
   (cons c p))
 
-(defn synth-p [size programs component]
+(defn synth-p [programs component]
   "Synthesizes new program by applying components of given size
   to existing programs."
-  (if (pos? size)
+  (if (pos? (:ar component))
     (map (fn [pr] {:prog (gen-p (:prog pr) component)}) programs)
     (list {:prog (list component)})))
 
-(defn forward [size ps comps in out] ; TODO temp in out, do better
+(defn forward [ps comps in out]
+  "Synthesize more programs from given programs ps components."
   (reduce
    (fn [syn c]
-     (if (= (:ar c) size)
-       (let [synth (synth-p size ps c)
-             evald (reduce #(let [ev (eval-p (:prog %2) in out)]
-                              (if (every? (partial = :err) ev)
-                                %1
-                                (conj %1 (assoc %2 :val ev))))
-                           [] synth)]
-         (combine syn evald))
-       syn))
+     (let [synth (synth-p ps c)
+           evald (reduce #(let [ev (eval-p (:prog %2) in out)]
+                            (if (every? (partial = :err) ev)
+                              %1
+                              (conj %1 (assoc %2 :val ev))))
+                         [] synth)]
+       (combine syn evald)))
    ps
    comps))
 
@@ -133,16 +132,17 @@
       (update-in [:edges] #(conj % [(ifgoals 3) rslvr])))))
 
 (defn split-g [usher]
-  "SplitGoal rule, adds more resolvers to the goal graph."
+  "SplitGoal rule, adds resolvers to the goal graph if found."
   (let [graph (:graph usher)
         n (count (:root graph))
         ex (:ex usher)
         in  (ex 0)
-        out (ex 1)
+        out  (ex 1)
         gconds (g-conds (:goals graph)
                         (map :val (:syn usher)))
         ifgoals (map g-then-else gconds)]
-    (reduce #(if %2 (add-resolver %2 %1) %1) graph ifgoals)))
+    (assoc usher :graph
+           (reduce #(if %2 (add-resolver %2 %1) %1) graph ifgoals))))
 
 ;; Resolve
 
@@ -192,12 +192,10 @@
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
-  (loop [usher (init in out)
-         size  0]
-    (let [fwd   (forward size (:syn usher) comps in out)
+  (loop [usher (init in out)]
+    (let [fwd   (forward (:syn usher) comps in out)
           usher (assoc usher :syn fwd)
-          graph (split-g usher)
-          usher (assoc usher :graph graph)
+          usher (split-g usher)
           rslvd (reduce
                  (fn [ps rslvr]
                    (if-let [p (resolve-p rslvr usher)]
@@ -205,10 +203,9 @@
                      ps))
                  []
                  (get-in usher [:graph :resolvers]))]
+
       (if *usher-debug* (pprint usher))
 
       (if (seq rslvd)
         (first rslvd)
-        (recur usher
-               ;; TODO size
-               1 #_(inc size))))))
+        (recur usher)))))

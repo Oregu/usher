@@ -15,16 +15,15 @@
     (is (= (gen-p [zr fst] inc)
            (list inc zr fst)))
 
-    (is (= (synth-p 0 progid zr)
+    (is (= (synth-p progid zr)
            (list {:prog [zr]})))
 
-    (is (= (forward 0 (list progid) [zr fst] inv [])
-           (list {:prog [zr] :val [0 0 0]} progid)))
+    (is (= (forward (list progid) [zr fst] inv [])
+           (list {:prog [fst identity] :val '(1 2 3)}
+                 {:prog [zr]           :val '(0 0 0)}
+                 progid)))
 
-    (is (= (forward 1 (list progid) [zr fst] inv [])
-           (list {:prog [fst id] :val '(1 2 3)} progid)))
-
-    (is (= (forward 1 (list {:prog [zr] :val '(0 0 0)} progid) [inc] inv [])
+    (is (= (forward (list {:prog [zr] :val '(0 0 0)} progid) [inc] inv [])
            (list {:prog [inc zr] :val '(1 1 1)}
                  {:prog [zr] :val '(0 0 0)}
                  progid)))))
