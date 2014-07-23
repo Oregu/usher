@@ -8,6 +8,9 @@
                     :ar 1
                     :name "i"}]
             :val in}],      ; Collection of synthesized programs.
+   :evals #{(repeat (count in) :err)}
+                            ; Set of evaluations of synthesized programs
+                            ; so ot exclude duplicated programs.
                             ;; (bipartite) Goal graph:
    :graph {:goals  [out],   ; Goals (programs' valuations).
            :resolvers [],   ; Resolvers connecting goals to subgoals.
@@ -15,12 +18,6 @@
            :root     out}   ; Root, a result we should produce.
                             ;; Set of examples:
    :ex    [in out]})        ; Input and output vectors.
-
-(defn combine [v1 v2]
-  "Utility. Combine two vectors."
-  (if (empty? v2)
-    v1
-    (apply conj v1 v2)))
 
 ;; Saturate
 
@@ -64,19 +61,25 @@
     (map (fn [pr] {:prog (gen-p (:prog pr) component)}) programs)
     (list {:prog (list component)})))
 
-(defn forward [ps comps in out]
+(defn forward [comps usher]
   "Synthesize more programs from given programs ps components."
-  (reduce
-   (fn [syn c]
-     (let [synth (synth-p ps c)
-           evald (reduce #(let [ev (eval-p (:prog %2) in out)]
-                            (if (every? (partial = :err) ev)
-                              %1
-                              (conj %1 (assoc %2 :val ev))))
-                         [] synth)]
-       (combine syn evald)))
-   ps
-   comps))
+  (let [ps  (:syn usher)
+        in  ((:ex usher) 0)
+        out ((:ex usher) 1)]
+   (reduce
+    (fn [usher c]
+      (let [synth (synth-p ps c) ; TODO synth with synthesized, not
+                                        ; with ps
+            evald (reduce #(let [ev (eval-p (:prog %2) in out)]
+                             (if ((:evals usher) ev)
+                               %1
+                               (conj %1 (assoc %2 :val ev))))
+                          [] synth)]
+        (-> usher
+            (update-in [:syn] into evald)
+            (update-in [:evals] into (map :val evald)))))
+    usher
+    comps)))
 
 ;; Split goal
 
@@ -193,8 +196,7 @@
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)]
-    (let [fwd   (forward (:syn usher) comps in out)
-          usher (assoc usher :syn fwd)
+    (let [usher (forward comps usher)
           usher (split-g usher)
           rslvd (reduce
                  (fn [ps rslvr]
