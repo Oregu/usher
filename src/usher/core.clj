@@ -1,5 +1,6 @@
 (ns usher.core
-  (:use clojure.pprint))
+  (:use clojure.pprint)
+  (:require [clojure.math.combinatorics :as combo]))
 
 (def ^:dynamic *usher-debug* false)
 
@@ -21,7 +22,6 @@
 
 ;; Saturate
 
-;; TODO do saturation
 (defn oracle [val ind in out]
   ;; TODO well-defined relation, condition is wrong too. Rethink
   (if (and (> (count (last in)) (count val)) (not= (in ind) val))
@@ -30,6 +30,9 @@
      :noval
      (map list in out))
     :err))
+
+;; No saturation implemented.
+;; One needs to pass continous list of values.
 
 (defn wrap-p [p in out]
   (fn [arg ind]
@@ -43,29 +46,37 @@
               (reverse p)) ; f(g(h(args))) or f(g(h))
       (catch Throwable t :err))))
 
-(defn eval-p [p in out] ; TODO TEMP in out, rethink
+(defn eval-p [p in out] ; TODO TEMP in out for oracle, rethink
   "Evaluates program p given inputs vector in. Returns :err on error."
   (map-indexed #((wrap-p p in out) %2 %1) in))
 
 ;; Forward
 
-;; TODO only size 0 and 1 supported
 (defn gen-p [p c]
   "Generate new program with component and existing programs."
-  (cons c p))
+  (if (= (:ar c) 1)
+    (cons c p)
+    (list c p)))
 
 (defn synth-p [programs component]
   "Synthesizes new program by applying components of given size
   to existing programs."
-  (if (pos? (:ar component))
-    (map (fn [pr] {:prog (gen-p (:prog pr) component)}) programs)
-    (list {:prog (list component)})))
+  (let [arity (:ar component)
+        progs (map :prog programs)]
+    (if (> arity (count programs))
+      '()
+      (if (pos? arity)
+        (map (fn [pr] {:prog (gen-p pr component)})
+             (if (= arity 1)
+               progs
+               (combo/combinations progs arity)))
+        (list {:prog (list component)})))))
 
 (defn forward [comps usher]
   "Synthesize more programs from given programs ps components."
   (let [ps  (:syn usher)
-        in  ((:ex usher) 0)
-        out ((:ex usher) 1)]
+        in  (first (:ex usher))
+        out (second (:ex usher))]
    (reduce
     (fn [usher c]
       (let [synth (synth-p ps c) ; TODO synth with synthesized, not
@@ -144,7 +155,7 @@
         gconds (g-conds (:goals graph)
                         (map :val (:syn usher)))
         ifgoals (map g-then-else gconds)]
-    (assoc usher :graph
+    (assoc usher :graph ; TODO Don't repeat resolvers
            (reduce #(if %2 (add-resolver %2 %1) %1) graph ifgoals))))
 
 ;; Resolve
@@ -206,7 +217,7 @@
                  []
                  (get-in usher [:graph :resolvers]))]
 
-      (if *usher-debug* (pprint usher))
+      (if *usher-debug* (do (pprint usher) (read-line)))
 
       (if (seq rslvd)
         (first rslvd)
