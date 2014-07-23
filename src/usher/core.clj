@@ -32,21 +32,27 @@
     :err))
 
 ;; No saturation implemented.
-;; One needs to pass continous list of values.
+;; For Oracle to work for recursive functions,
+;; one needs to pass continous list of values.
 
 (defn wrap-p [p in out]
   (fn [arg ind]
     (try
-      (reduce #(if (pos? (:ar %2))
-                 (if (= (:fn %2) :self)
-                   (oracle %1 ind in out)
-                   ((:fn %2) %1))
-                 ((:fn %2)))
+      (reduce (fn [arg fun]           ; TODO What a mess
+                (if (list? fun)
+                  (map #((wrap-p % in out) arg ind) fun)
+                  (if (pos? (:ar fun))
+                    (if (= (:fn fun) :self)
+                      (oracle arg ind in out)
+                      (if (= (:ar fun) 1)
+                        ((:fn fun) arg)
+                        (apply (:fn fun) arg)))
+                    ((:fn fun)))))
               arg
-              (reverse p)) ; f(g(h(args))) or f(g(h))
+              (reverse p)) ; f(g(h(args))) or f(g(h)) or even f(g(h), m(n))
       (catch Throwable t :err))))
 
-(defn eval-p [p in out] ; TODO TEMP in out for oracle, rethink
+(defn eval-p [p in out] ; TODO TEMP [in out] for oracle, rethink
   "Evaluates program p given inputs vector in. Returns :err on error."
   (map-indexed #((wrap-p p in out) %2 %1) in))
 

@@ -45,9 +45,9 @@
   (is (= (eval-p [{:fn first :ar 1}] [[] [2] [1 2]] nil)
          [nil 2 1]))
 
-  (is (= (eval-p [{:fn + :ar 2}
-                  [[{:fn five :ar 0}]
-                   [:fn first :ar 1]]]
+  (is (= (eval-p (list {:fn + :ar 2}
+                       (list (list {:fn five  :ar 0})
+                             (list {:fn first :ar 1})))
                  [[1] [2 3] [4]]
                  nil)
          [6 7 9])))
