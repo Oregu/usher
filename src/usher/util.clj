@@ -12,15 +12,15 @@
        (if (= :if (first p))
          (do
            (print "if")
-           (print-p (:prog (p 1)))
+           (print-p (p 1))
            (println)
            (indent n)
            (print "  then")
-           (print-p (:prog (p 2)))
+           (print-p (p 2))
            (println)
            (indent n)
            (print "  else")
-           (print-p (:prog (p 3)))
+           (print-p (p 3))
            (println))
          (do
           (if wrap (print " ("))
@@ -42,6 +42,4 @@
 (defn extract-p [p]
   (if (= :if (first p))
     (cons :if (map extract-p (rest p)))
-    (->> p
-         :prog
-         (map extract-fn))))
+    (map extract-fn p)))

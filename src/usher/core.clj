@@ -22,6 +22,10 @@
 
 ;; Saturate
 
+;; No saturation implemented.
+;; For Oracle to work for recursive functions,
+;; one needs to pass continous list of values.
+
 (defn oracle [val ind in out]
   ;; TODO well-defined relation, condition is wrong too. Rethink
   (if (and (> (count (last in)) (count val)) (not= (in ind) val))
@@ -31,30 +35,40 @@
      (map list in out))
     :err))
 
-;; No saturation implemented.
-;; For Oracle to work for recursive functions,
-;; one needs to pass continous list of values.
+;; Evaluation
 
 (defn wrap-p [p in out]
   (fn [arg ind]
     (try
-      (reduce (fn [arg fun]           ; TODO What a mess
-                (if (map? fun)
-                  (if (pos? (:ar fun))
-                    (if (= (:fn fun) :self)
-                      (oracle arg ind in out)
-                      (if (= (:ar fun) 1)
-                        ((:fn fun) arg)
-                        (apply (:fn fun) arg)))
-                    ((:fn fun)))
-                  (map #((wrap-p % in out) arg ind) fun)))
-              arg
-              (reverse p)) ; f(g(h(args))) or f(g(h)) or even f(g(h), m(n))
+      (if (= :if (first p))
+        (if ((wrap-p (p 1) in out) arg ind)
+          ((wrap-p (p 2) in out) arg ind)
+          ((wrap-p (p 3) in out) arg ind))  ;
+        (reduce (fn [arg fun]                ; TODO What a mess.
+                  (if (map? fun)            ;
+                    (if (pos? (:ar fun))
+                      (if (= (:fn fun) :self)
+                        (oracle arg ind in out)
+                        (if (= (:ar fun) 1)
+                          ((:fn fun) arg)
+                          (apply (:fn fun) arg)))
+                      ((:fn fun)))
+                    (map #((wrap-p % in out) arg ind) fun)))
+                arg
+                (reverse p))) ; f(g(h(args))) or f(g(h)) or even f(g(h), m(n))
       (catch Throwable t :err))))
 
 (defn eval-p [p in out] ; TODO TEMP [in out] for oracle, rethink
   "Evaluates program p given inputs vector in. Returns :err on error."
   (map-indexed #((wrap-p p in out) %2 %1) in))
+
+(defn eval-ps [ps evals in out]
+  "Return back list of programs with valuations. No repeats."
+  (reduce #(let [ev (eval-p (:prog %2) in out)]
+             (if (evals ev)
+               %1
+               (conj %1 (assoc %2 :val ev))))  ; TODO update evals
+          [] ps))
 
 ;; Forward
 
@@ -70,7 +84,7 @@
   (let [arity (:ar component)
         progs (map :prog programs)]
     (if (> arity (count programs))
-      (list)
+      '()
       (if (pos? arity)
         (map (fn [pr] {:prog (gen-p pr component)})
              (if (= arity 1)
@@ -81,16 +95,12 @@
 (defn forward [comps usher]
   "Synthesize more programs from given programs ps components."
   (let [ps  (:syn usher)
-        in  (first (:ex usher))
-        out (second (:ex usher))]
+        in  ((:ex usher) 0)
+        out ((:ex usher) 1)]
     (reduce
      (fn [usher c]
        (let [synth (synth-p (:syn usher) c)
-             evald (reduce #(let [ev (eval-p (:prog %2) in out)]
-                              (if ((:evals usher) ev)
-                                %1
-                                (conj %1 (assoc %2 :val ev))))
-                           [] synth)]
+             evald (eval-ps synth (:evals usher) in out)]
          (-> usher
              (update-in [:syn] into evald)
              (update-in [:evals] into (map :val evald)))))
@@ -165,11 +175,9 @@
 ;; Resolve
 
 (defn equal-g [g1 g2]
-  (every?
-   #(or
-     (= (first %1) (second %1))
-     (some (partial = :?) [(first %1) (second %1)]))
-   (map list g1 g2)))
+  (every? #(or (= (first %1) (second %1))
+               (some (partial = :?) [(first %1) (second %1)]))
+          (map list g1 g2)))
 
 (defn match-g [ps g in out]
   "Find programs in ps which match goal g on input in."
@@ -185,9 +193,8 @@
                  %1)) [] edges)))
 
 (defn resolve-p [r usher]
-  "Resolve r with programs ps with given graph."
+  "Resolve r with programs ps in graph. Give back resolved program."
   (let [es (edges r (:graph usher))
-        rg (es 0)
         g1 (es 1) ; TODO bad
         g2 (es 2)
         g3 (es 3)
@@ -195,34 +202,43 @@
         p1 (some #(if (equal-g g1 (:val %1)) %1) ps)
         p2 (some #(if (equal-g g2 (:val %1)) %1) ps)
         p3 (some #(if (equal-g g3 (:val %1)) %1) ps)]
-    ;; TODO rg= is a temp termination condition
-    ;; This should check for resolvance of some resolver,
-    ;; Not termination.
-    (if (and p1 p2 p3
-             (= rg (:root (:graph usher))))
-      [:if p1 p2 p3])))
+    (if (and p1 p2 p3)
+      [:if (:prog p1) (:prog p2) (:prog p3)])))
+
+(defn resolve-g [usher]
+  (let [in  ((:ex usher) 0)
+        out ((:ex usher) 1)
+        ps (reduce
+            (fn [ps rslvr]
+              (if-let [p (resolve-p rslvr usher)]
+                (conj ps {:prog p})
+                ps))
+            [] (get-in usher [:graph :resolvers]))
+        evald (eval-ps ps (:evals usher) in out)]
+    (-> usher
+        (update-in [:syn] into evald)   ; TODO DRY
+        (update-in [:evals] into (map :val evald)))))
 
 ;; Termination
 
-;; TODO termination is when root goal resolved.
+(defn terminate [usher]
+  "Return program resolving root goal. If one exists."
+  (let [root (get-in usher [:graph :root])]
+    (some (fn [pr] (if (= root (:val pr)) pr))
+          (:syn usher))))
 
 ;; Entry-point
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)]
-    (let [usher (forward comps usher)
-          usher (split-g usher)
-          rslvd (reduce
-                 (fn [ps rslvr]
-                   (if-let [p (resolve-p rslvr usher)]
-                     (conj ps p)
-                     ps))
-                 []
-                 (get-in usher [:graph :resolvers]))]
-
+    (let [usher (->> usher
+                     (forward comps)
+                     (split-g)
+                     (resolve-g))
+          answer (terminate usher)]
       (if *usher-debug* (do (pprint usher) (read-line)))
 
-      (if (seq rslvd)
-        (first rslvd)
+      (if answer
+        (:prog answer)
         (recur usher)))))

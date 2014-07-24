@@ -60,4 +60,26 @@
                               {:fn identity :ar 1}]))
                  [[1] [2 3] [4]]
                  nil)
-         [6 7 9])))
+         [6 7 9]))
+
+  (is (= (eval-p [:if
+                  [{:fn empty? :ar 1}]
+                  [{:fn zero   :ar 0}]
+                  [{:fn first  :ar 1}]] [[] [2] [1 2]] nil)
+         [0 2 1])))
+
+(deftest t-resolve
+  (let [in    [[] [2] [1 2]]
+        out   [0 2 1]
+        usher (init in out)
+        progid (first (:syn usher))
+        id  (first (:prog progid))
+        zr  {:prog [{:fn zero   :ar 0}] :val [0 0 0]}
+        emp {:prog [{:fn empty? :ar 1}] :val [true false false]}
+        fst {:prog [{:fn first  :ar 1}] :val [:err 2 1]}
+        usher (update-in usher [:syn] conj zr emp fst)
+        usher (split-g usher)]
+
+    (is (= (last (:syn (resolve-g usher)))
+           {:prog [:if (:prog emp) (:prog zr) (:prog fst)]
+            :val [0 2 1]}))))
