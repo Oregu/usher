@@ -3,9 +3,10 @@
         [usher.util]))
 
 (defn zero [] 0)
+(defn one  [] 1)
 
 (defn gen-length []
-  "Generates length recursive function."
+  "Generate Length recursive program."
   (run
    [[ ] [2] [1 2]]                    ; input
    [ 0   1    2  ]                    ; output
@@ -28,6 +29,8 @@
     [0 1 1 2 3 5 8]
     [{:fn +     :ar 2 :name "+"  }
      {:fn =     :ar 2 :name "="  }
+     {:fn zero  :ar 1 :name "0"  }
+     {:fn one   :ar 1 :name "1"  }
      {:fn dec   :ar 1 :name "dec"}
      {:fn :self :ar 1 :name "fib"}])))
 
@@ -35,7 +38,7 @@
   (print-p (gen-fib)))
 
 (defn gen-sum []
-  "Generates sum recursive function."
+  "Generate Sum recursive program."
   (run
    [[ ] [2] [3 2]]                    ; input
    [ 0   2    5  ]                    ; output
