@@ -13,10 +13,12 @@
         progid (first (:syn usher))
         id  (first (:prog progid))
         zr  {:fn zero  :ar 0}
+        fv  {:fn five  :ar 0}
         fst {:fn first :ar 1}
         inc {:fn inc   :ar 1}
         pls {:fn +     :ar 2}
-        withzr (update-in usher [:syn] conj {:prog [zr] :val [0 0 0]})]
+        withzr (update-in usher [:syn] conj {:prog [zr] :val [0 0 0]})
+        withfv (update-in usher [:syn] conj {:prog [fv] :val [5 5 5]})]
 
     (is (= (gen-p [zr fst] inc)
            (list inc zr fst)))
@@ -39,15 +41,23 @@
     (is (= (:syn (forward [inc] withzr))
            [progid
             {:prog [zr]     :val '(0 0 0)}
-            {:prog [inc zr] :val '(1 1 1)}]))))
+            {:prog [inc zr] :val '(1 1 1)}]))
+
+    (is (= (:syn (forward [fst pls] withfv))
+           [progid
+            {:prog [fv]     :val '(5 5 5)}
+            {:prog [fst id] :val '(1 2 3)}
+            {:prog [pls [[fv] [fst id]]]
+             :val '(6 7 8)}]))))
 
 (deftest t-eval
   (is (= (eval-p [{:fn first :ar 1}] [[] [2] [1 2]] nil)
          [nil 2 1]))
 
   (is (= (eval-p (list {:fn + :ar 2}
-                       (list (list {:fn five  :ar 0})
-                             (list {:fn first :ar 1})))
+                       (list [{:fn five     :ar 0}]
+                             [{:fn first    :ar 1}
+                              {:fn identity :ar 1}]))
                  [[1] [2 3] [4]]
                  nil)
          [6 7 9])))

@@ -39,15 +39,15 @@
   (fn [arg ind]
     (try
       (reduce (fn [arg fun]           ; TODO What a mess
-                (if (list? fun)
-                  (map #((wrap-p % in out) arg ind) fun)
+                (if (map? fun)
                   (if (pos? (:ar fun))
                     (if (= (:fn fun) :self)
                       (oracle arg ind in out)
                       (if (= (:ar fun) 1)
                         ((:fn fun) arg)
                         (apply (:fn fun) arg)))
-                    ((:fn fun)))))
+                    ((:fn fun)))
+                  (map #((wrap-p % in out) arg ind) fun)))
               arg
               (reverse p)) ; f(g(h(args))) or f(g(h)) or even f(g(h), m(n))
       (catch Throwable t :err))))
@@ -70,7 +70,7 @@
   (let [arity (:ar component)
         progs (map :prog programs)]
     (if (> arity (count programs))
-      '()
+      (list)
       (if (pos? arity)
         (map (fn [pr] {:prog (gen-p pr component)})
              (if (= arity 1)
@@ -83,20 +83,19 @@
   (let [ps  (:syn usher)
         in  (first (:ex usher))
         out (second (:ex usher))]
-   (reduce
-    (fn [usher c]
-      (let [synth (synth-p ps c) ; TODO synth with synthesized, not
-                                        ; with ps
-            evald (reduce #(let [ev (eval-p (:prog %2) in out)]
-                             (if ((:evals usher) ev)
-                               %1
-                               (conj %1 (assoc %2 :val ev))))
-                          [] synth)]
-        (-> usher
-            (update-in [:syn] into evald)
-            (update-in [:evals] into (map :val evald)))))
-    usher
-    comps)))
+    (reduce
+     (fn [usher c]
+       (let [synth (synth-p (:syn usher) c)
+             evald (reduce #(let [ev (eval-p (:prog %2) in out)]
+                              (if ((:evals usher) ev)
+                                %1
+                                (conj %1 (assoc %2 :val ev))))
+                           [] synth)]
+         (-> usher
+             (update-in [:syn] into evald)
+             (update-in [:evals] into (map :val evald)))))
+     usher
+     comps)))
 
 ;; Split goal
 
