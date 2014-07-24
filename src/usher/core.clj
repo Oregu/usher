@@ -114,7 +114,7 @@
           [] goals))
 
 (defn g-conds [goals evals]
-  "Produces _arbitrary_ cond goals."
+  "Produces arbitrary cond goals. Intersects goals and evals."
   (reduce (fn [conds goal]
             (if-let [g-inters (seq (g-intersects goal evals))]
               (apply conj conds g-inters)
@@ -129,8 +129,7 @@
         bthen (map-indexed (fn [ind itm] (if (true?  itm) (g ind) :?)) cnd)
         belse (map-indexed (fn [ind itm] (if (false? itm) (g ind) :?)) cnd)]
     (if (or (= [:? :? :?] belse) (= [:? :? :?] bthen))
-      nil ; TODO We don't want 'don't care' goals.
-          ; Need not generate them at all
+      nil
       [g cnd (vec bthen) (vec belse)])))
 
 (defn add-resolver [ifgoals graph]

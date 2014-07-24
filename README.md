@@ -6,8 +6,8 @@ Clojure implementation of [paper](http://research.microsoft.com/en-us/um/people/
 
 What it can do
 --------------
-It can generate length recursive function within 15 seconds. Very alpha.  
-Consider not working.
+It can generate `length` and `sum` recursive functions. Very alpha.  
+Can't generate Fibonacci yet. Consider not working.
 
 Run it with
 ```clojure

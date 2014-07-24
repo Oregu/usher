@@ -34,7 +34,14 @@
                       p))
           (if wrap (print ")")))))))
 
+(defn extract-fn [fun]
+  (if (map? fun)
+    (:fn fun)
+    (map extract-fn fun)))
+
 (defn extract-p [p]
   (if (= :if (first p))
     (cons :if (map extract-p (rest p)))
-    (->> p :prog (map :fn))))
+    (->> p
+         :prog
+         (map extract-fn))))
