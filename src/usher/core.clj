@@ -115,7 +115,7 @@
 ;; Split goal
 
 (defn true-indexes [cond]
-  (loop [arr cond 
+  (loop [arr cond
          ind 0
          acc []]
     (if (empty? arr)
@@ -126,6 +126,8 @@
                (conj acc ind)
                acc)))))
 
+;; TODO Right now it turns off just one true at a time.
+;; Should turn to false permutations of indexes.
 (defn arbitrary-g [cond g]
   (let [inds (true-indexes cond)]
     (if (> (count inds) 1)
