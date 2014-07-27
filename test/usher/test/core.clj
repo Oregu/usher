@@ -1,4 +1,5 @@
 (ns usher.test.core
+  (:refer-clojure :exclude [resolve])
   (:use [usher.core]
         [clojure.test]))
 
@@ -68,9 +69,10 @@
           fwd2  (forward [dec lt1 self pls] usher)
           usher (merge-with into usher fwd2)
           fwd2  (:syn fwd2)
-          usplt (split-g usher)
+          usplt (split usher)
           goals (:goals (:graph usplt))
-          urslv (resolve-g usplt)
+          rslv  (resolve usplt)
+          urslv (merge-with into usplt rslv)
           fwd3  (:syn urslv)
           ifs   (filter #(= :if (first (:prog %))) fwd3)]
 
@@ -156,9 +158,9 @@
         emp {:prog [{:fn empty? :ar 1}] :val [true false false]}
         fst {:prog [{:fn first  :ar 1}] :val [:err 2 1]}
         usher (update-in usher [:syn] conj zr emp fst)
-        usher (split-g usher)]
+        usher (split usher)]
 
-    (is (= (last (:syn (resolve-g usher)))
+    (is (= (last (:syn (resolve usher)))
            {:prog [:if (:prog emp) (:prog zr) (:prog fst)]
             :val [0 2 1]}))))
 

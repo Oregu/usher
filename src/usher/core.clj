@@ -1,4 +1,5 @@
 (ns usher.core
+  (:refer-clojure :exclude [resolve])
   (:use clojure.pprint)
   (:require [clojure.math.combinatorics :as combo]))
 
@@ -74,7 +75,7 @@
              (if ((:evals %1) val)
                %1
                (-> %1
-                   (update-in [:syn] conj (assoc %2 :val val))
+                   (update-in [:syn]   conj (assoc %2 :val val))
                    (update-in [:evals] conj val))))
           {:syn [] :evals evals}
           ps))
@@ -151,14 +152,13 @@
              %1)
           [] evals))
 
-(defn g-conds [goals evals]
+(defn conds-g [goals evals]
   "Produces arbitrary cond goals. Intersects goals and evals."
   (reduce (fn [conds goal]
             (if-let [g-inters (seq (intersects-g goal evals))]
               (apply conj conds g-inters)
               conds))
-          []
-          goals))
+          [] goals))
 
 (defn branch-g [cond+g]
   "For a cond goal vector, build bthen and belse goals.
@@ -183,14 +183,14 @@
         (update-in [:edges] conj [(ifgoals 2) rslvr])
         (update-in [:edges] conj [(ifgoals 3) rslvr]))))
 
-(defn split-g [usher]
+(defn split [usher]
   "SplitGoal rule, adds resolvers to the goal graph if found."
   (let [graph (:graph usher)
         n (count (:root graph))
         ex (:ex usher)
         in  (ex 0)
         out  (ex 1)
-        gconds (g-conds (:goals graph)
+        gconds (conds-g (:goals graph)
                         (map :val (:syn usher)))
         ifgoals (map branch-g gconds)]
     (assoc usher :graph ; TODO Don't repeat resolvers
@@ -212,6 +212,10 @@
                  (conj %1 (first %2))
                  %1)) [] edges)))
 
+(defn find-p [goal evals ps]
+  "Find a program resolving a goal."
+  (some #(if (equal-g goal (:val %1)) %1) ps))
+
 (defn resolve-p [r usher]
   "Resolve r with programs ps in graph. Give back resolved program."
   (let [es (edges r (:graph usher))
@@ -219,25 +223,29 @@
         g2 (es 2)
         g3 (es 3)
         ps (:syn usher)
-        p1 (some #(if (equal-g g1 (:val %1)) %1) ps)
-        p2 (some #(if (equal-g g2 (:val %1)) %1) ps)
-        p3 (some #(if (equal-g g3 (:val %1)) %1) ps)]
+        ex (:ex usher)
+        evals (:evals usher)
+        p1 (find-p g1 evals ps)  ;
+        p2 (find-p g2 evals ps)  ; TODO that's inefficient
+        p3 (find-p g3 evals ps)] ;
     (if (and p1 p2 p3)
-      [:if (:prog p1) (:prog p2) (:prog p3)])))
+      (let [pif [:if (:prog p1) (:prog p2) (:prog p3)]
+            val (eval-p pif (first ex) (second ex))]
+        (if (not (evals val))
+          {:prog pif :val val})))))
 
-(defn resolve-g [usher]
+(defn resolve [usher]
   (let [in  ((:ex usher) 0)
-        out ((:ex usher) 1)
-        ps (reduce
-            (fn [ps rslvr]
-              (if-let [p (resolve-p rslvr usher)]
-                (conj ps {:prog p})
-                ps))
-            [] (get-in usher [:graph :resolvers]))
-        evald (eval-ps ps (:evals usher) in out)]
-    (-> usher
-        (update-in [:syn]   into (:syn evald))
-        (update-in [:evals] into (:evals evald)))))
+        out ((:ex usher) 1)]
+    (reduce
+     (fn [ps rslvr]
+       (if-let [p (resolve-p rslvr usher)]
+         (-> ps
+             (update-in [:syn]   conj p)
+             (update-in [:evals] conj (:val p)))
+         ps))
+     {:syn [] :evals (:evals usher)}
+     (get-in usher [:graph :resolvers]))))
 
 ;; Termination
 
@@ -255,8 +263,9 @@
           usher (-> usher
                     (assoc :syn   (:syn   ps))
                     (assoc :evals (:evals ps)))
-          usher (split-g usher)
-          usher (resolve-g usher)
+          usher (split usher)
+          synif (resolve usher)
+          usher (merge-with into usher synif)
           answer (terminate (:root (:graph usher)) (:syn usher))]
       (if *usher-debug* (do (pprint usher) (read-line)))
 

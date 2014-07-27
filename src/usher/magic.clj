@@ -1,4 +1,5 @@
 (ns usher.magic
+  (:refer-clojure :exclude [resolve])
   (:use [usher.core]
         [usher.util]))
 
