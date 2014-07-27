@@ -43,41 +43,43 @@
 
     (is (= (:syn (forward [zr fst] usher))
            [progid
-            {:prog [zr]     :val '(0 0 0)}
-            {:prog [fst id] :val '(1 2 3)}]))
+            {:prog [zr]     :val [0 0 0]}
+            {:prog [fst id] :val [1 2 3]}]))
 
     (is (= (:syn (forward [inc] withzr))
            [progid
-            {:prog [zr]     :val '(0 0 0)}
-            {:prog [inc zr] :val '(1 1 1)}]))
+            {:prog [zr]     :val [0 0 0]}
+            {:prog [inc zr] :val [1 1 1]}]))
 
     (is (= (:syn (forward [fst pls] withfv))
            [progid
-            {:prog [fv]     :val '(5 5 5)}
-            {:prog [fst id] :val '(1 2 3)}
-            {:prog [pls [[fv] [fv]]]         :val '(10 10 10)}
-            {:prog [pls [[fv] [fst id]]]     :val '(6 7 8)}
-            {:prog [pls [[fst id] [fv]]]     :val '(6 7 8)}
-            {:prog [pls [[fst id] [fst id]]] :val '(2 4 6)}]))
+            {:prog [fv]     :val [5 5 5]}
+            {:prog [fst id] :val [1 2 3]}
+            {:prog [pls [[fv] [fv]]]         :val [10 10 10]}
+            {:prog [pls [[fv] [fst id]]]     :val [6 7 8]}
+            {:prog [pls [[fst id] [fst id]]] :val [2 4 6]}]))
 
     (let [in    [0 1 2 3 4 5]
           out   [0 1 1 2 3 5]
           usher (init in out)
-          usher (forward [dec lt1 self pls] usher)
-          fwd1  (:syn usher)
-          usher (forward [dec lt1 self pls] usher)
-          fwd2  (:syn usher)
+          fwd1  (forward [dec lt1 self pls] usher)
+          usher (merge-with into usher fwd1)
+          fwd1  (:syn fwd1)
+          fwd2  (forward [dec lt1 self pls] usher)
+          usher (merge-with into usher fwd2)
+          fwd2  (:syn fwd2)
           usplt (split-g usher)
           goals (:goals (:graph usplt))
           urslv (resolve-g usplt)
           fwd3  (:syn urslv)
           ifs   (filter #(= :if (first (:prog %))) fwd3)]
+
       (is (some #(= (:prog %) [dec id]) fwd1))
       (is (some #(= (:prog %) [self dec id]) fwd1))
       (is (some #(= (:prog %) [dec dec id]) fwd2))
       (is (some #(= (:prog %) [self dec dec id]) fwd2))
-      (is (some #(= (:prog %) [pls (list [self dec dec id]
-                                         [self dec id])]) fwd2))
+      (is (some #(= (:prog %) [pls (list [self dec id]
+                                         [self dec dec id])]) fwd2))
 
       (is (some #(= % [true true false false false false]) goals))
 

@@ -70,13 +70,13 @@
 (defn eval-ps [ps evals in out]
   "Return back a map with programs and updated valuations set.
   No repeats."
-  (reduce #(let [ev (eval-p (:prog %2) in out)]
-             (if (evals ev)
+  (reduce #(let [val (eval-p (:prog %2) in out)]
+             (if ((:evals %1) val)
                %1
                (-> %1
-                   (update-in [:ps] conj (assoc %2 :val ev))
-                   (update-in [:evals] conj ev))))
-          {:ps [] :evals evals}
+                   (update-in [:syn] conj (assoc %2 :val val))
+                   (update-in [:evals] conj val))))
+          {:syn [] :evals evals}
           ps))
 
 ;; Forward
@@ -104,16 +104,14 @@
 (defn forward [comps usher]
   "Synthesize more programs from given programs ps components."
   (let [ps  (:syn usher)
-        in  ((:ex usher) 0)
-        out ((:ex usher) 1)]
+        in  (first (:ex usher))
+        out (second (:ex usher))]
     (reduce
-     (fn [usher c]
-       (let [synth (synth-p (:syn usher) c)
-             evald (eval-ps synth (:evals usher) in out)]
-         (-> usher
-             (update-in [:syn]   into (:ps evald)) ; TODO DRY
-             (update-in [:evals] into (:evals evald)))))
-     usher
+     (fn [newps c]
+       (let [synth (synth-p (:syn newps) c)
+             evald (eval-ps synth (:evals newps) in out)]
+         (merge-with into newps evald)))
+     {:syn ps :evals (:evals usher)}
      comps)))
 
 ;; Split goal
@@ -238,7 +236,7 @@
             [] (get-in usher [:graph :resolvers]))
         evald (eval-ps ps (:evals usher) in out)]
     (-> usher
-        (update-in [:syn]   into (:ps evald))   ; TODO DRY
+        (update-in [:syn]   into (:syn evald))
         (update-in [:evals] into (:evals evald)))))
 
 ;; Termination
@@ -253,10 +251,12 @@
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)]
-    (let [usher (->> usher
-                     (forward comps)
-                     (split-g)
-                     (resolve-g))
+    (let [ps (forward comps usher)
+          usher (-> usher
+                    (assoc :syn   (:syn   ps))
+                    (assoc :evals (:evals ps)))
+          usher (split-g usher)
+          usher (resolve-g usher)
           answer (terminate (:root (:graph usher)) (:syn usher))]
       (if *usher-debug* (do (pprint usher) (read-line)))
 
