@@ -52,4 +52,3 @@
 
 (defn magic-fib []
   (print-p (gen-fib)))
-

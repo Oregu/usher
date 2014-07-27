@@ -100,7 +100,7 @@
                                [id]
                                [pls (list [self dec id]
                                           [self dec dec id])]]) ifs))
-      (is (= (:prog (terminate urslv))
+      (is (= (:prog (terminate (:root (:graph urslv)) (:syn urslv)))
              [:if
               [lt1 id]
               [id]

@@ -68,12 +68,16 @@
   (map-indexed #((wrap-p p in out) %2 %1) in))
 
 (defn eval-ps [ps evals in out]
-  "Return back list of programs with valuations. No repeats."
+  "Return back a map with programs and updated valuations set.
+  No repeats."
   (reduce #(let [ev (eval-p (:prog %2) in out)]
              (if (evals ev)
                %1
-               (conj %1 (assoc %2 :val ev))))  ; TODO update evals
-          [] ps))
+               (-> %1
+                   (update-in [:ps] conj (assoc %2 :val ev))
+                   (update-in [:evals] conj ev))))
+          {:ps [] :evals evals}
+          ps))
 
 ;; Forward
 
@@ -107,8 +111,8 @@
        (let [synth (synth-p (:syn usher) c)
              evald (eval-ps synth (:evals usher) in out)]
          (-> usher
-             (update-in [:syn] into evald)
-             (update-in [:evals] into (map :val evald)))))
+             (update-in [:syn]   into (:ps evald)) ; TODO DRY
+             (update-in [:evals] into (:evals evald)))))
      usher
      comps)))
 
@@ -134,17 +138,17 @@
       (into [[cond g]] (map (fn [i] [(assoc cond i false) g]) inds))
       [[cond g]])))
 
-(defn g-intersect [g1 g2]
+(defn intersect-g [g1 g2]
   "Returns boolean vector with truth in places of intersected positions.
   If no interse found, returns nil."
   (let [inter (mapv = g1 g2)]
     (if (and (some true?  inter)
              (some false? inter)) inter)))
 
-(defn g-intersects [g evals]
+(defn intersects-g [g evals]
   "Returns bool vector of intersections between goal g
   and each of the evals."
-  (reduce #(if-let [inter (g-intersect g %2)]
+  (reduce #(if-let [inter (intersect-g g %2)]
              (into %1 (arbitrary-g inter g))
              %1)
           [] evals))
@@ -152,7 +156,7 @@
 (defn g-conds [goals evals]
   "Produces arbitrary cond goals. Intersects goals and evals."
   (reduce (fn [conds goal]
-            (if-let [g-inters (seq (g-intersects goal evals))]
+            (if-let [g-inters (seq (intersects-g goal evals))]
               (apply conj conds g-inters)
               conds))
           []
@@ -234,16 +238,15 @@
             [] (get-in usher [:graph :resolvers]))
         evald (eval-ps ps (:evals usher) in out)]
     (-> usher
-        (update-in [:syn] into evald)   ; TODO DRY
-        (update-in [:evals] into (map :val evald)))))
+        (update-in [:syn]   into (:ps evald))   ; TODO DRY
+        (update-in [:evals] into (:evals evald)))))
 
 ;; Termination
 
-(defn terminate [usher]
+;; TODO Return not first but smallest
+(defn terminate [root synth]
   "Return program resolving root goal. If one exists."
-  (let [root (get-in usher [:graph :root])]
-    (some (fn [pr] (if (= root (:val pr)) pr))
-          (:syn usher))))
+  (some (fn [pr] (if (= root (:val pr)) pr)) synth))
 
 ;; Entry-point
 
@@ -254,7 +257,7 @@
                      (forward comps)
                      (split-g)
                      (resolve-g))
-          answer (terminate usher)]
+          answer (terminate (:root (:graph usher)) (:syn usher))]
       (if *usher-debug* (do (pprint usher) (read-line)))
 
       (if answer
