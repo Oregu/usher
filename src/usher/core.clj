@@ -74,9 +74,8 @@
   (reduce #(let [val (eval-p (:prog %2) in out)]
              (if ((:evals %1) val)
                %1
-               (-> %1
-                   (update-in [:syn]   conj (assoc %2 :val val))
-                   (update-in [:evals] conj val))))
+               (-> (update-in %1 [:syn] conj (assoc %2 :val val))
+                   (update-in  [:evals] conj val))))
           {:syn [] :evals evals}
           ps))
 
@@ -258,9 +257,8 @@
     (reduce
      (fn [ps rslvr]
        (if-let [p (resolve-p rslvr usher)]
-         (-> ps
-             (update-in [:syn]   conj p)
-             (update-in [:evals] conj (:val p)))
+         (-> (update-in ps [:syn] conj p)
+             (update-in  [:evals] conj (:val p)))
          ps))
      {:syn [] :evals (:evals usher)}
      (get-in usher [:graph :resolvers]))))
@@ -278,8 +276,7 @@
   {:pre [(= (count in) (count out))]}
   (loop [usher (init in out)]
     (let [ps (forward comps usher)
-          usher (-> usher
-                    (assoc :syn   (:syn   ps))
+          usher (-> (assoc usher :syn (:syn   ps))
                     (assoc :evals (:evals ps)))
           usher (split usher)
           synif (resolve usher)
