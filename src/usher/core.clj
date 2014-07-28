@@ -30,10 +30,10 @@
 (defn oracle [val ind in out]
   ;; TODO well-defined relation, condition is wrong too. Rethink
   (if (or (and (coll? (first in))
-               (> (count (last in)) (count val))
+               (> (count (peek in)) (count val))
                (not= (in ind) val))
           (and (number? (first in))
-               (> (last in) val)
+               (> (peek in) val)
                (not= (in ind) val)))
     (reduce
      #(if (= (first %2) val) (second %2) %1)
