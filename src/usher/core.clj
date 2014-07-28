@@ -205,16 +205,36 @@
 
 (defn edges [rslvr graph]
   "Find resolver's edges in graph."
-  (let [edges (:edges graph)]
-    (reduce #(if (= rslvr (first %2))
-               (conj %1 (second %2))
-               (if (= rslvr (second %2))
-                 (conj %1 (first %2))
-                 %1)) [] edges)))
+  (let [edges (:edges graph)
+        cnt (count edges)]
+    (loop [ind 0]
+      (if (= rslvr (first (edges ind)))
+        [(second (edges ind))
+         (first (edges (inc ind)))
+         (first (edges (inc (inc ind))))
+         (first (edges (inc (inc (inc ind)))))]
+        (if (< ind cnt)
+          (recur (inc ind)))))))
 
-(defn find-p [goal evals ps]
-  "Find a program resolving a goal."
-  (some #(if (equal-g goal (:val %1)) %1) ps))
+(defn find-p [goals evals ps]
+  "Find programs resolving goals."
+  (let [g1 (goals 0)
+        g2 (goals 1)
+        g3 (goals 2)]
+    (loop [ps ps
+           acc [nil nil nil]]
+      (if (empty? ps)
+        acc
+        (let [prog (first ps)
+              acc (if (and (nil? (acc 0)) (equal-g g1 (:val prog)))
+                    (assoc acc 0 prog) acc)
+              acc (if (and (nil? (acc 1)) (equal-g g2 (:val prog)))
+                    (assoc acc 1 prog) acc)
+              acc (if (and (nil? (acc 2)) (equal-g g3 (:val prog)))
+                    (assoc acc 2 prog) acc)]
+          (if (not-any? nil? acc)
+            acc
+            (recur (rest ps) acc)))))))
 
 (defn resolve-p [r usher]
   "Resolve r with programs ps in graph. Give back resolved program."
@@ -225,9 +245,7 @@
         ps (:syn usher)
         ex (:ex usher)
         evals (:evals usher)
-        p1 (find-p g1 evals ps)  ;
-        p2 (find-p g2 evals ps)  ; TODO that's inefficient
-        p3 (find-p g3 evals ps)] ;
+        [p1 p2 p3] (find-p [g1 g2 g3] evals ps)]
     (if (and p1 p2 p3)
       (let [pif [:if (:prog p1) (:prog p2) (:prog p3)]
             val (eval-p pif (first ex) (second ex))]

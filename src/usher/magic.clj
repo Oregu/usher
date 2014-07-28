@@ -1,14 +1,13 @@
 (ns usher.magic
-  (:refer-clojure :exclude [resolve])
-  (:use [usher.core]
-        [usher.util]))
+  (:require [usher.core :as usher])
+  (:use [usher.util]))
 
 (defn zero [] 0)
 (defn one  [] 1)
 
 (defn gen-length []
   "Generate Length recursive program."
-  (run
+  (usher/run
    [[ ] [2] [1 2]]                    ; input
    [ 0   1    2  ]                    ; output
    [{:fn zero   :ar 0 :name "zero"  } ; components with arity a(c)
@@ -24,7 +23,7 @@
 
 (defn gen-sum []
   "Generate Sum recursive program."
-  (run
+  (usher/run
    [[ ] [2] [3 2]]                    ; input
    [ 0   2    5  ]                    ; output
    [{:fn zero   :ar 0 :name "zero"  } ; components
@@ -40,7 +39,7 @@
 
 (defn gen-fib []
   "Generate Fibonacci program."
-  (run
+  (usher/run
    [0 1 2 3 4 5]
    [0 1 1 2 3 5]
    [#_{:fn =     :ar 2 :name "="  }
