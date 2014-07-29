@@ -1,13 +1,11 @@
 Usher
 =====
-Recursive program synthesis from example.  
-
-Clojure implementation of [paper](http://research.microsoft.com/en-us/um/people/sumitg/pubs/cav13.pdf).
+Recursive program synthesis from example. Clojure implementation of [paper](http://research.microsoft.com/en-us/um/people/sumitg/pubs/cav13.pdf).
 
 What it can do
 --------------
-It can generate `length` and `sum` recursive functions. Very alpha.  
-Can't generate Fibonacci yet. Consider not working.
+It can generate programs and even recursive programs.  
+It's still in alpha status. But here is what you already can do:
 
 Run it with
 ```clojure
@@ -21,7 +19,7 @@ if empty? i
   then zero 
   else inc length rest i 
 ```
-Which is a recursively defined length program generated with the following input:
+Which is a recursively defined `length` program generated with the following input:
 ```clojure
 (run
    [[ ] [2] [1 2]]     ; input examples
@@ -39,7 +37,8 @@ if i <= 1
   then i
   else (+ (fib dec i) (fib dec dec i))
 ```
-And that is pretty cool. Result obtained from following examples and components:
+And that is pretty cool.  
+Result obtained from following examples and components:
 ```clojure
 (usher/run
    [0 1 2 3 4 5]
