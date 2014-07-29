@@ -53,7 +53,8 @@ More examples in the [magic.clj](https://github.com/Oregu/usher/blob/master/src/
 To do
 -----
 - [ ] Optimisations (fibonacci take 5 sec to synthesize, while authors report 0.12 sec).
-- [ ] More examples.
+- [ ] Synthesize programs with arity > 1. (To generate append program.)
+- [ ] More examples (append).
 
 Research
 --------
