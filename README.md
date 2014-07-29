@@ -32,7 +32,28 @@ Which is a recursively defined length program generated with the following input
     {:fn first  :ar 1}
     {:fn rest   :ar 1}}])
 ```
+Or we can generate Fibonacci program the same way:
+```clojure
+user> (magic-fib)
+if i <= 1
+  then i
+  else (+ (fib dec i) (fib dec dec i))
+```
+And that is pretty cool. Result obtained from following examples and components:
+```clojure
+(usher/run
+   [0 1 2 3 4 5]
+   [0 1 1 2 3 5]
+   [{:fn dec       :ar 1}
+    {:fn #(<= % 1) :ar 1}
+    {:fn +         :ar 2}])
+```
 
 To do
 -----
-- [ ] Generate Fibonacci program.
+- [ ] Optimisations (fibonacci take 5 sec to synthesize, while authors report 0.12 sec).
+- [ ] More examples.
+
+Research
+--------
+- [ ] Will it be able to support higher-order functions?
