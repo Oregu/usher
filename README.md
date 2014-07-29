@@ -40,13 +40,15 @@ if i <= 1
 And that is pretty cool.  
 Result obtained from following examples and components:
 ```clojure
-(usher/run
+(run
    [0 1 2 3 4 5]
    [0 1 1 2 3 5]
    [{:fn dec       :ar 1}
     {:fn #(<= % 1) :ar 1}
     {:fn +         :ar 2}])
 ```
+
+More examples in the [magic.clj](https://github.com/Oregu/usher/blob/master/src/usher/magic.clj) file.
 
 To do
 -----
