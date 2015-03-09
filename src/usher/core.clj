@@ -274,7 +274,7 @@
 
 (defn run [in out comps]
   {:pre [(= (count in) (count out))]}
-  (loop [usher (init in out)]
+  (loop [usher (init in out) ind 1]
     (let [ps (forward comps usher)
           usher (-> (assoc usher :syn (:syn   ps))
                     (assoc :evals (:evals ps)))
@@ -283,7 +283,7 @@
           usher (merge-with into usher synif)
           answer (terminate (:root (:graph usher)) (:syn usher))]
       (if *usher-debug* (do (pprint usher) (read-line)))
-
+      (println ind)
       (if answer
         (:prog answer)
-        (recur usher)))))
+        (recur usher (inc ind))))))

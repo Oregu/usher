@@ -1,4 +1,4 @@
-(defproject usher "0.0.1"
+(defproject usher "0.0.3"
   :description "Resursive program syntesis."
   :url "http://github.com/Oregu/usher"
 

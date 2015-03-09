@@ -70,3 +70,18 @@
 
 ;; Can we generate this instead?
 ;; (mapcat (fn [e] (list e e)) '(1 2))
+
+(defn gen-Q []
+  "Generate freaky Q program from GEB book."
+  (usher/run
+   [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17]
+   [1 1 2 3 3 4 5 5 6 6  6  8  8  8  10 9  10]
+   [{:fn dec   :ar 1 :name "dec"}
+    {:fn one   :ar 1 :name "1"  }
+    {:fn #(<= % 2) :ar 1 :name "2 >=" }
+    {:fn :self :ar 1 :name "Q"  }
+    {:fn +     :ar 2 :name "+"  }
+    {:fn -     :ar 2 :name "-"  }]))
+
+(defn magic-Q []
+  (print-p (gen-Q)))
